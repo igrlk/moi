@@ -21,7 +21,7 @@ import { copyFile, mkdir, readFile, rm, stat, truncate, writeFile } from 'node:f
 import { homedir, userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import { CONTROL_URL } from './constants'
+import { CONTROL_URL, PORT } from './constants'
 import { DATA_DIR } from './data-dir'
 import { mergeSearchPaths } from './harness/shell-path'
 import { PACKAGE_ROOT } from './version'
@@ -342,7 +342,20 @@ function username(): string {
 
 // ---- running-server introspection -------------------------------------------
 
-export type ServerInfo = { version: string; pid: number; port: number; service: boolean }
+export type ServerInfo = {
+  version: string
+  pid: number
+  port: number
+  // Set when the web side listens on a socket file (the `unixSocket` setting)
+  // instead of `port`.
+  unixSocket?: string
+  service: boolean
+}
+
+// Where the running server's web side can be reached, for CLI messages.
+export function webAddress(info: ServerInfo | null): string {
+  return info?.unixSocket ?? `http://localhost:${info?.port || PORT}`
+}
 
 // Ask the running server who it is over the control port. Resolves null when
 // no server is up — or when an older server (without `server:info`) is; pair
@@ -378,6 +391,7 @@ export function queryServerInfo(timeoutMs = 1500): Promise<ServerInfo | null> {
             version: data.version,
             pid: typeof data.pid === 'number' ? data.pid : 0,
             port: typeof data.port === 'number' ? data.port : 0,
+            unixSocket: typeof data.unixSocket === 'string' ? data.unixSocket : undefined,
             service: data.service === true
           })
         } else {

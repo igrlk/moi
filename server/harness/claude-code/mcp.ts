@@ -1,6 +1,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { McpServerStatus, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 
+import { claudeCodeSpawn } from '../../agent-launcher'
 import { debugEnabled } from '../../debug'
 import { requireHarnessExecutable } from '../executable'
 
@@ -62,6 +63,7 @@ async function probeMcpStatus(workspacePath: string): Promise<McpServerStatus[]>
     options: {
       cwd: workspacePath,
       pathToClaudeCodeExecutable: requireHarnessExecutable('claude-code'),
+      spawnClaudeCodeProcess: claudeCodeSpawn(),
       persistSession: false,
       settingSources: ['user', 'project'],
       env: { ...process.env, CLAUDECODE: undefined }

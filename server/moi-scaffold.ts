@@ -6,6 +6,7 @@ import { appendFile, mkdir, open, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 
+import { agentCommand } from './agent-launcher'
 import { syncAppletDeclarations } from './applets/declarations'
 
 // Dependency set available to widgets. `react`/`react-dom` are stubs — at
@@ -54,7 +55,7 @@ async function runBunInstall(moiDir: string, logPath: string): Promise<number> {
     await log.writeFile(
       `bun install started at ${new Date().toISOString()}\nWorking directory: ${moiDir}\n\n`
     )
-    install = Bun.spawn(['bun', 'install'], {
+    install = Bun.spawn(agentCommand(['bun', 'install']), {
       cwd: moiDir,
       stdin: 'ignore',
       // Direct file descriptors keep capturing both streams after a

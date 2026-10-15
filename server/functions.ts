@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
 
+import { agentCommand } from './agent-launcher'
 import { resolveWorkspaceEnv } from './workspace-env'
 
 const WORKER_PATH = join(import.meta.dir, 'functions-worker.ts')
@@ -132,7 +133,7 @@ function spawnSlot(workspacePath: string, workspaceEnv: Record<string, string>):
     modules: new Set()
   }
 
-  slot.worker = Bun.spawn([process.execPath, WORKER_PATH], {
+  slot.worker = Bun.spawn(agentCommand([process.execPath, WORKER_PATH]), {
     // Neutral cwd so Bun doesn't auto-load the workspace's `.env`; the worker
     // chdir()s to MEI_WORKSPACE_ROOT at startup to restore cwd = workspace root.
     cwd: tmpdir(),

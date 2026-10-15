@@ -1,3 +1,5 @@
+import { agentCommand } from '../../agent-launcher'
+
 // Include the version in CLI identity: auto-updates can replace the binary
 // without changing its path.
 
@@ -24,7 +26,7 @@ export function claudeCliKey(cli: ClaudeCli): string {
 export async function probeClaudeCli(executable: string): Promise<ClaudeCli> {
   let timeout: ReturnType<typeof setTimeout> | undefined
   try {
-    const proc = Bun.spawn([executable, '--version'], {
+    const proc = Bun.spawn(agentCommand([executable, '--version']), {
       stdin: 'ignore',
       stdout: 'pipe',
       stderr: 'ignore'

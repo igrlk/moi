@@ -29,6 +29,7 @@ import { tapWire } from '../debug'
 import { broadcast } from '../../state'
 import { hasSessionConfig, saveSessionConfig } from '../../session-config'
 import { renameSessionReferences } from '../../session-lifecycle'
+import { claudeCodeSpawn } from '../../agent-launcher'
 import { resolveWorkspaceEnv } from '../../workspace-env'
 import { requireHarnessExecutable } from '../executable'
 import type { SendMessageInput } from '../types'
@@ -596,6 +597,7 @@ function createLiveSession(input: {
   const options: Options = {
     abortController: abort,
     pathToClaudeCodeExecutable: requireHarnessExecutable('claude-code'),
+    spawnClaudeCodeProcess: claudeCodeSpawn(),
     // One query spans many user messages.
     maxTurns: 1000,
     cwd: input.workspacePath,

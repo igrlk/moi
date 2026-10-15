@@ -10,6 +10,7 @@
 // is protocol. See ./wire.ts for the message shapes.
 import type { InitializeResponse, RequestPermissionRequest } from './wire'
 
+import { agentCommand } from '../../agent-launcher'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { resolveWorkspaceEnv } from '../../workspace-env'
@@ -76,7 +77,7 @@ const CLIENT_CAPABILITIES = { fs: { readTextFile: false, writeTextFile: false } 
 async function startClient(spec: AcpSpawnSpec): Promise<ClientRecord> {
   const { provider, command, args, workspacePath } = spec
   const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
-  const proc = Bun.spawn([command, ...args], {
+  const proc = Bun.spawn(agentCommand([command, ...args]), {
     cwd: workspacePath,
     stdin: 'pipe',
     stdout: 'pipe',

@@ -3,8 +3,11 @@ import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
 import { isMoiContext } from '@/lib/moi-context'
 
+import { rm } from 'node:fs/promises'
+
 import index from '../client/index.html'
 import { api } from './api'
+import { getAppConfig } from './app-config'
 import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
@@ -107,9 +110,20 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 // HTTP API route is delegated to the Hono app (`./api`) via `fetch`.
 await Promise.all((await listWorkspaces()).map(failInterruptedViewStarts))
 
+// Managed machines serve the web side on a Unix socket file that only the
+// machine's gateway can open, so nothing else running there reaches the API
+// meant for people (docs/config.md). A socket file left by a previous
+// run would make the bind fail.
+const { unixSocket } = getAppConfig()
+if (unixSocket) await rm(unixSocket, { force: true })
+const listen = unixSocket
+  ? { unix: unixSocket }
+  : { port: PORT, hostname: process.env.HOST ?? '127.0.0.1' }
+
 export const app = Bun.serve<WsData>({
-  port: PORT,
-  hostname: process.env.HOST ?? '127.0.0.1',
+  // Bun types the port and Unix-socket listeners as separate overloads, so a
+  // listener picked at runtime is cast to one of them; the runtime takes either.
+  ...(listen as { port: number; hostname: string }),
   // Agent startup/discovery can outlast Bun's 10s HTTP default. Allow the
   // harness's 30s RPC timeout to return an error before the socket closes.
   idleTimeout: 60,

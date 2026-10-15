@@ -8,6 +8,7 @@ import { resolveUrl } from '@/lib/navigation'
 import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 import { navigationRelay } from './navigation-relay'
 
+import { getAppConfig } from './app-config'
 import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
 import { serializeWorkspaceBundle } from './bundle-queue'
 import { CONTROL_HOST, CONTROL_PORT, PORT } from './constants'
@@ -17,6 +18,7 @@ import { processIcon } from './icon'
 import { loadLayout, saveLayout } from './layout'
 import { publishEvent } from './events'
 import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './registry'
+import { requiredEnvFor } from './required-env'
 import { executeScratchOp } from './scratchpad-executor'
 import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
 import { relayScratchOp } from './scratchpad-relay'
@@ -33,6 +35,13 @@ import {
   type WorkspaceConfigPatch
 } from './workspace-config'
 import { VERSION } from './version'
+import {
+  getWorkspaceEnvView,
+  parseEnvUpdate,
+  resolveWorkspaceEnv,
+  secretBackend,
+  updateWorkspaceEnv
+} from './workspace-env'
 
 type ControlSocket = { send(data: string): void }
 
@@ -101,6 +110,7 @@ export const control = Bun.serve({
               version: VERSION,
               pid: process.pid,
               port: PORT,
+              unixSocket: getAppConfig().unixSocket ?? undefined,
               service: !!process.env.MOI_SERVICE
             })
           )
@@ -362,13 +372,35 @@ export const control = Bun.serve({
           return
         }
 
-        if (data.type === 'env:changed') {
-          // A CLI env write (`moi env set`/`unset`) already landed on disk —
-          // reap + broadcast so it takes effect (same path as PUT /env).
+        // `moi env` reads and writes the workspace env only through here, so a
+        // write takes effect at once (same path as PUT /env), and the agent on
+        // a managed machine, which can't open moi's data folder, can use it.
+        if (data.type === 'env:view') {
           const match = await resolveWorkspace(ws, data.path)
           if (!match) return
+          const view = await getWorkspaceEnvView(match.path, requiredEnvFor(match.path))
+          ws.send(JSON.stringify({ view }))
+          return
+        }
+
+        if (data.type === 'env:update') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          const patch = parseEnvUpdate(data.patch)
+          if (typeof patch === 'string') {
+            ws.send(JSON.stringify({ error: patch }))
+            return
+          }
+          await updateWorkspaceEnv(match.path, patch)
           applyEnvChanged(match)
-          ws.send(JSON.stringify({ ok: true }))
+          ws.send(JSON.stringify({ ok: true, backend: await secretBackend() }))
+          return
+        }
+
+        if (data.type === 'env:resolve') {
+          const match = await resolveWorkspace(ws, data.path)
+          if (!match) return
+          ws.send(JSON.stringify({ env: await resolveWorkspaceEnv(match.path) }))
           return
         }
 

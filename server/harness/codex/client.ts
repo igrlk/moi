@@ -20,6 +20,7 @@ import type { WorkspaceActivityPreview } from '../types'
 import { findHarnessExecutable, requireHarnessExecutable } from '../executable'
 import { createCodexTransport, type Json, type NotificationListener } from './transport'
 import { readCodexPages } from './pagination'
+import { agentCommand } from '../../agent-launcher'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { resolveWorkspaceEnv } from '../../workspace-env'
@@ -123,7 +124,7 @@ async function startClient(workspacePath: string): Promise<ClientRecord> {
 
   const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
   const startedAt = Date.now()
-  const proc = Bun.spawn([bin, 'app-server'], {
+  const proc = Bun.spawn(agentCommand([bin, 'app-server']), {
     cwd: workspacePath,
     stdin: 'pipe',
     stdout: 'pipe',

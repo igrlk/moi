@@ -1,6 +1,8 @@
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { chmod, mkdtemp, rm } from 'node:fs/promises'
+
+import { agentCommand } from '../agent-launcher'
 
 const MAX_TITLE_SOURCE_LENGTH = 1_000
 const MAX_GENERATED_TITLE_LENGTH = 64
@@ -71,7 +73,7 @@ export async function runSessionTitleCommand(input: {
 }): Promise<string | null> {
   if (input.signal.aborted) return null
   try {
-    const proc = Bun.spawn([...input.command], {
+    const proc = Bun.spawn(agentCommand(input.command), {
       cwd: input.cwd,
       stdin: new Blob([input.stdin ?? '']),
       stdout: 'pipe',
@@ -87,8 +89,15 @@ export async function runSessionTitleCommand(input: {
   }
 }
 
+// On managed machines the title command runs as the agent's user, which is
+// neither the folder's owner nor in its group, so the folder is open to
+// everyone: the agent works in it and Codex writes its answer there. It holds
+// only the schema and the title, for one run. moi stays the owner, which is
+// what lets it remove the folder from /tmp afterwards.
 export async function createSessionTitleTempDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'moi-session-title-'))
+  const path = await mkdtemp(join(tmpdir(), 'moi-session-title-'))
+  await chmod(path, 0o777)
+  return path
 }
 
 export async function removeSessionTitleTempDir(path: string): Promise<void> {

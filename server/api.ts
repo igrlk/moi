@@ -88,14 +88,13 @@ import { submitView, ViewStartupError } from './view-sessions'
 import { listWidgets, serveWidget } from './widgets'
 import { getWorkspaceConfig, setWorkspaceConfig } from './workspace-config'
 import {
-  CREATED_WORKSPACES_ROOT,
+  createdWorkspacesRoot,
   provisionWorkspace,
   validateWorkspaceFolderName
 } from './workspace-init'
 import { resolveWorkspaceImportMetadata } from './workspace-import'
 import type { WorkspaceImportMetadata } from './workspace-import'
-import { getWorkspaceEnvView, isValidEnvKey, updateWorkspaceEnv } from './workspace-env'
-import type { EnvUpdate } from './workspace-env'
+import { getWorkspaceEnvView, parseEnvUpdate, updateWorkspaceEnv } from './workspace-env'
 import {
   getCachedUpdateStatus,
   hasRunningAgentSessions,
@@ -639,35 +638,8 @@ one.get('/env', async c => {
 // the only way).
 one.put('/env', async c => {
   const ws = c.get('ws')
-  const body = await c.req.json().catch(() => null)
-  if (!body || typeof body !== 'object') {
-    return c.text('Bad request', 400)
-  }
-  const patch: EnvUpdate = {}
-  if (body.set !== undefined) {
-    if (typeof body.set !== 'object' || body.set === null) {
-      return c.text('set must be an object', 400)
-    }
-    for (const [k, v] of Object.entries(body.set)) {
-      if (!isValidEnvKey(k)) return c.text(`Invalid env key: ${k}`, 400)
-      if (typeof v !== 'string') {
-        return c.text(`Value for ${k} must be a string`, 400)
-      }
-    }
-    patch.set = body.set as Record<string, string>
-  }
-  if (body.remove !== undefined) {
-    if (!Array.isArray(body.remove) || body.remove.some((k: unknown) => typeof k !== 'string')) {
-      return c.text('remove must be an array of strings', 400)
-    }
-    patch.remove = body.remove as string[]
-  }
-  if (body.inheritDotenv !== undefined) {
-    if (typeof body.inheritDotenv !== 'boolean') {
-      return c.text('inheritDotenv must be a boolean', 400)
-    }
-    patch.inheritDotenv = body.inheritDotenv
-  }
+  const patch = parseEnvUpdate(await c.req.json().catch(() => null))
+  if (typeof patch === 'string') return c.text(patch, 400)
 
   // Skip the write + reaps for a no-op PUT (no recognized fields) so an empty
   // body doesn't needlessly kill warm workers / idle sessions.
@@ -1043,13 +1015,13 @@ async function harnessAvailability(): Promise<Record<string, HarnessAvailability
 // backends whose runtime is missing.
 workspaces.get('/create', async c =>
   c.json({
-    root: CREATED_WORKSPACES_ROOT,
-    displayRoot: tildify(CREATED_WORKSPACES_ROOT),
+    root: createdWorkspacesRoot(),
+    displayRoot: tildify(createdWorkspacesRoot()),
     availability: await harnessAvailability()
   })
 )
 
-// Create a brand-new workspace: a fresh folder under CREATED_WORKSPACES_ROOT,
+// Create a brand-new workspace: a fresh folder under createdWorkspacesRoot(),
 // provisioned (skills + `.moi/` scaffold) and registered.
 workspaces.post('/create', async c => {
   if (getAppConfig().cloudDemo) return c.text(DEMO_CREATE_BLOCKED, 403)
@@ -1067,7 +1039,7 @@ workspaces.post('/create', async c => {
   const name = typeof body?.name === 'string' ? body.name.trim() : ''
   const invalid = validateWorkspaceFolderName(name)
   if (invalid) return c.text(invalid, 400)
-  const path = join(CREATED_WORKSPACES_ROOT, name)
+  const path = join(createdWorkspacesRoot(), name)
   if (existsSync(path)) return c.text('A folder with that name already exists', 409)
   try {
     await provisionWorkspace(path, type)

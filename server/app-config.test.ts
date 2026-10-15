@@ -20,7 +20,10 @@ test('defaults apply when no config file exists', () => {
     cloudDemo: false,
     experimental: { collab: false },
     demoInstallUrl: 'https://moi.computer',
-    cloudflareAccess: null
+    cloudflareAccess: null,
+    workspacesDir: null,
+    agentLauncher: null,
+    unixSocket: null
   })
 })
 
@@ -104,6 +107,32 @@ test('wrong-typed keys are dropped individually, valid keys survive', async () =
   expect(config.cloudDemo).toBe(false)
   expect(config.experimental.collab).toBe(false)
   expect(config.demoInstallUrl).toBe('https://moi.computer')
+})
+
+test('managed-machine paths come from config.json only, and must be absolute', async () => {
+  const errors: string[] = []
+  const spy = spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    errors.push(args.map(String).join(' '))
+  })
+  try {
+    const file = await configFile(
+      JSON.stringify({
+        workspacesDir: '/data/workspaces',
+        agentLauncher: '/opt/moi/bin/agent-run',
+        unixSocket: 'run/moi/web.sock'
+      })
+    )
+    const config = loadAppConfig(file, {
+      MOI_WORKSPACES_DIR: '/elsewhere',
+      MOI_AGENT_LAUNCHER: '/tmp/launcher'
+    })
+    expect(config.workspacesDir).toBe('/data/workspaces')
+    expect(config.agentLauncher).toBe('/opt/moi/bin/agent-run')
+    expect(config.unixSocket).toBeNull()
+    expect(errors.join('\n')).toContain('"unixSocket"')
+  } finally {
+    spy.mockRestore()
+  }
 })
 
 test('the resolved config is frozen', () => {

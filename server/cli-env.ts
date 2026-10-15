@@ -1,17 +1,61 @@
 // CLI face over the workspace env model (workspace-env.ts): rendering for
-// `moi env`, secret-value input for `moi env set`, the exec spawn, and the
-// control-port notification that lets a running server pick up CLI writes.
+// `moi env`, secret-value input for `moi env set`, and the exec spawn. Every
+// read and write goes to the running server over the control port.
 //
-// Secret VALUES never pass through here except on their way into a spawned
-// process (`execWithEnv`) or the secret store (`set` reads stdin/argv). Nothing
+// Secret VALUES never pass through here except on their way to the server
+// (`set` reads stdin/argv) or into a spawned process (`execWithEnv`). Nothing
 // in this module prints a value.
 import type { WorkspaceEntry, WorkspaceEnvView } from '@/lib/types'
 
 import pc from './cli-pc'
 import { columns } from './cli-ui'
 import { CONTROL_URL } from './constants'
-import { findWorkspaceForPath, listWorkspaces } from './registry'
-import { discoverDotenvKeys, resolveWorkspaceEnv } from './workspace-env'
+import { controlFailureMessage, probeControlServer } from './control-client'
+import { findWorkspaceForPath } from './registry'
+import { type EnvUpdate, discoverDotenvKeys } from './workspace-env'
+
+// ---------------------------------------------------------------------------
+// The server
+// ---------------------------------------------------------------------------
+
+// The server owns the registry and the env stores: it applies a write at once
+// and queues writes per workspace, so the CLI never touches the files itself.
+// That is also the only way in for the agent on a managed machine, whose OS
+// user can't open moi's data folder (docs/config.md).
+
+function serverFail(message: string): never {
+  console.error('\n' + pc.red('✗') + ' ' + message + '\n')
+  process.exit(1)
+}
+
+// One control-port request and its reply. Exits with the server's error, or
+// with why it couldn't be reached, like the other workspace commands.
+function askServer(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const unreachable = () =>
+    void probeControlServer().then(p => serverFail(controlFailureMessage(p)))
+  return new Promise(resolve => {
+    let ws: WebSocket
+    try {
+      ws = new WebSocket(CONTROL_URL)
+    } catch {
+      unreachable()
+      return
+    }
+    ws.onopen = () => ws.send(JSON.stringify(payload))
+    ws.onmessage = event => {
+      ws.close()
+      let res: Record<string, unknown>
+      try {
+        res = JSON.parse(String(event.data))
+      } catch {
+        serverFail('Unexpected reply from moi')
+      }
+      if (typeof res.error === 'string') serverFail(res.error)
+      resolve(res)
+    }
+    ws.onerror = unreachable
+  })
+}
 
 // ---------------------------------------------------------------------------
 // Workspace resolution: cwd → nearest registered workspace
@@ -22,7 +66,8 @@ import { discoverDotenvKeys, resolveWorkspaceEnv } from './workspace-env'
 // any subdirectory). Exits with a hint when cwd is outside every workspace, so
 // a typo never creates an orphan env entry keyed to a phantom path.
 export async function resolveCwdWorkspace(): Promise<WorkspaceEntry> {
-  const match = findWorkspaceForPath(await listWorkspaces(), process.cwd())
+  const { workspaces } = await askServer({ type: 'workspace:list' })
+  const match = findWorkspaceForPath(workspaces as WorkspaceEntry[], process.cwd())
   if (!match) {
     console.error(
       '\n' +
@@ -33,6 +78,23 @@ export async function resolveCwdWorkspace(): Promise<WorkspaceEntry> {
     process.exit(1)
   }
   return match
+}
+
+// ---------------------------------------------------------------------------
+// Reading and writing the env
+// ---------------------------------------------------------------------------
+
+// The workspace env as `moi env` shows it (key names, never values), with the
+// keys its widgets and views require.
+export async function readEnvView(path: string): Promise<WorkspaceEnvView> {
+  return (await askServer({ type: 'env:view', path })).view as WorkspaceEnvView
+}
+
+// Apply an env patch; the server makes it take effect at once. Returns where
+// the secrets are stored, for the plaintext-fallback notice.
+export async function writeEnv(path: string, patch: EnvUpdate): Promise<'keychain' | 'file'> {
+  const res = await askServer({ type: 'env:update', path, patch })
+  return res.backend === 'file' ? 'file' : 'keychain'
 }
 
 // ---------------------------------------------------------------------------
@@ -159,48 +221,6 @@ export async function readSecretValue(key: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// Server notification after a CLI write
-// ---------------------------------------------------------------------------
-
-// Env is frozen at spawn — a running server must reap the widget worker and
-// idle agent sessions for a CLI write to take effect (mirrors PUT /env). Sends
-// `env:changed` over the control port; resolves false when no server is
-// running (fine: the next server start resolves fresh env anyway).
-export function notifyEnvChanged(path: string): Promise<boolean> {
-  return new Promise(resolve => {
-    let ws: WebSocket
-    try {
-      ws = new WebSocket(CONTROL_URL)
-    } catch {
-      resolve(false)
-      return
-    }
-    const timer = setTimeout(() => {
-      try {
-        ws.close()
-      } catch {}
-      resolve(false)
-    }, 1500)
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'env:changed', path }))
-    ws.onmessage = event => {
-      clearTimeout(timer)
-      ws.close()
-      // A malformed reply must still settle the promise — the CLI awaits this.
-      try {
-        const res: unknown = JSON.parse(String(event.data))
-        resolve(typeof res === 'object' && res !== null && (res as { ok?: unknown }).ok === true)
-      } catch {
-        resolve(false)
-      }
-    }
-    ws.onerror = () => {
-      clearTimeout(timer)
-      resolve(false)
-    }
-  })
-}
-
-// ---------------------------------------------------------------------------
 // `moi env exec`
 // ---------------------------------------------------------------------------
 
@@ -210,7 +230,9 @@ export function notifyEnvChanged(path: string): Promise<boolean> {
 // missing.
 export async function execWithEnv(workspacePath: string, cmd: string[]): Promise<number> {
   const [resolved, dotenvKeys] = await Promise.all([
-    resolveWorkspaceEnv(workspacePath),
+    askServer({ type: 'env:resolve', path: workspacePath }).then(
+      res => res.env as Record<string, string>
+    ),
     discoverDotenvKeys(workspacePath)
   ])
   // Bun auto-loads the workspace `.env` into THIS process when the CLI runs

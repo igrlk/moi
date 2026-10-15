@@ -328,6 +328,33 @@ export type EnvUpdate = {
   inheritDotenv?: boolean
 }
 
+// Validate an env patch that arrives from outside the process (PUT /env, the
+// control port). Returns the patch, or an error message for the caller.
+export function parseEnvUpdate(body: unknown): EnvUpdate | string {
+  if (!body || typeof body !== 'object') return 'Bad request'
+  const raw = body as Record<string, unknown>
+  const patch: EnvUpdate = {}
+  if (raw.set !== undefined) {
+    if (typeof raw.set !== 'object' || raw.set === null) return 'set must be an object'
+    for (const [k, v] of Object.entries(raw.set)) {
+      if (!isValidEnvKey(k)) return `Invalid env key: ${k}`
+      if (typeof v !== 'string') return `Value for ${k} must be a string`
+    }
+    patch.set = raw.set as Record<string, string>
+  }
+  if (raw.remove !== undefined) {
+    if (!Array.isArray(raw.remove) || raw.remove.some(k => typeof k !== 'string')) {
+      return 'remove must be an array of strings'
+    }
+    patch.remove = raw.remove as string[]
+  }
+  if (raw.inheritDotenv !== undefined) {
+    if (typeof raw.inheritDotenv !== 'boolean') return 'inheritDotenv must be a boolean'
+    patch.inheritDotenv = raw.inheritDotenv
+  }
+  return patch
+}
+
 // Apply a patch to a workspace's custom secrets + metadata. Patch (not replace)
 // semantics, because values are write-only — the UI can add/update one key
 // without resending the others. Serialized per workspace to avoid lost updates.

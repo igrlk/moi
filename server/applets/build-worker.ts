@@ -34,6 +34,7 @@ import { join } from 'path'
 
 import type { AppletKind, ViewConfig, WidgetConfig } from '@/lib/types'
 
+import { agentCommand } from '../agent-launcher'
 import { buildApplet } from './build-applet'
 
 export type BuildJob = {
@@ -130,7 +131,7 @@ export function buildAppletsInChild(req: Omit<BuildRequest, 'type'>): Promise<Bu
       resolve(results)
     }
     const request: BuildRequest = { type: 'build', ...req }
-    const proc = Bun.spawn([process.execPath, WORKER_PATH], {
+    const proc = Bun.spawn(agentCommand([process.execPath, WORKER_PATH]), {
       stdio: ['ignore', 'inherit', 'inherit'],
       serialization: 'json',
       ipc(message, child) {

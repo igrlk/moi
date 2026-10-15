@@ -5,6 +5,7 @@
 // chat appears stuck (loader spinning) and you want to know whether the server
 // still holds a live session for that thread, or when a widget's server call
 // hangs and you want to see whether its worker is alive and what it has loaded.
+import { getAppConfig } from './app-config'
 import { CONTROL_PORT, PORT } from './constants'
 import { debugEnabled } from './debug'
 import { WORKER_LIMITS, type WorkerDebugInfo, getWorkersDebugSnapshot } from './functions'
@@ -73,7 +74,8 @@ export function renderStatus(): string {
   lines.push('')
   lines.push(`version         ${VERSION}${process.env.MOI_SERVICE ? '  (service-managed)' : ''}`)
   lines.push(`uptime          ${fmtDuration(now - STARTED_AT)}`)
-  lines.push(`http port       ${PORT}`)
+  const { unixSocket } = getAppConfig()
+  lines.push(unixSocket ? `web socket      ${unixSocket}` : `http port       ${PORT}`)
   lines.push(`control port    ${CONTROL_PORT}`)
   lines.push(`debug logging   ${debugEnabled ? 'on (--debug)' : 'off'}`)
   lines.push(`connected tabs  ${getClientCount()}`)

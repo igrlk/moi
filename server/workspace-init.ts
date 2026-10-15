@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import type { WorkspaceType } from '@/lib/types'
 export { validateWorkspaceFolderName } from '@/lib/workspace-name'
 
+import { getAppConfig } from './app-config'
 import { harnessFor } from './harness/registry'
 import { createDependencyInstallLogPath, scaffoldMoiDir } from './moi-scaffold'
 import { installBundledSkills } from './skills-template'
@@ -24,8 +25,11 @@ export function skillsDirFor(workspaceRoot: string, type?: WorkspaceType): strin
 
 // Folder that holds workspaces created from the UI (`/workspace/create`) — a
 // visible home-dir folder, mirroring how Cowork keeps its session folders under
-// the user's home rather than an app-data dir.
-export const CREATED_WORKSPACES_ROOT = join(homedir(), 'moi')
+// the user's home rather than an app-data dir. Managed machines set their own
+// (`workspacesDir` in config.json).
+export function createdWorkspacesRoot(): string {
+  return getAppConfig().workspacesDir ?? join(homedir(), 'moi')
+}
 
 export type ProvisionResult = {
   // Where the skills were installed (backend-dependent, see skillsDirFor).

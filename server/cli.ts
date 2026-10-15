@@ -3,7 +3,7 @@ import './cli-colors' // must precede citty: sets NO_COLOR before its color flag
 import { defineCommand, runMain, showUsage } from 'citty'
 import { formatHex } from 'culori'
 import { parse as devalueParse } from 'devalue'
-import { existsSync } from 'node:fs'
+import { accessSync, constants, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'path'
 import pc from './cli-pc'
@@ -41,15 +41,17 @@ import type {
 
 import {
   execWithEnv,
-  notifyEnvChanged,
+  readEnvView,
   readSecretValue,
   renderEnvView,
-  resolveCwdWorkspace
+  resolveCwdWorkspace,
+  writeEnv
 } from './cli-env'
 import { columns, keyValue } from './cli-ui'
 import { installCollabSkill } from './collab/skill'
 import { CONTROL_HOST, CONTROL_PORT, CONTROL_URL, PORT } from './constants'
 import { type ControlProbe, controlFailureMessage, probeControlServer } from './control-client'
+import { canUseDataDir } from './data-dir'
 import {
   HARNESS_TYPES,
   type DetectedAgent,
@@ -88,7 +90,8 @@ import {
   restartService,
   serviceLogPath,
   serviceStatus,
-  uninstallService
+  uninstallService,
+  webAddress
 } from './service'
 import {
   detectPackageManager,
@@ -101,12 +104,7 @@ import {
   updateArgv
 } from './update'
 import { VERSION, isPrerelease, versionWithCommit } from './version'
-import {
-  getWorkspaceEnvView,
-  isValidEnvKey,
-  secretBackend,
-  updateWorkspaceEnv
-} from './workspace-env'
+import { isValidEnvKey } from './workspace-env'
 import { provisionWorkspace } from './workspace-init'
 
 // ---- helpers ----------------------------------------------------------------
@@ -133,6 +131,12 @@ async function waitForServer(timeoutMs = 10_000): Promise<boolean> {
 }
 
 async function registerViaControl(absPath: string): Promise<string> {
+  try {
+    accessSync(absPath, constants.R_OK | constants.W_OK | constants.X_OK)
+  } catch {
+    console.error('\n' + pc.red('✗') + ` Can't open ${absPath} for reading and writing\n`)
+    process.exit(1)
+  }
   return new Promise((res, rej) => {
     const ws = new WebSocket(CONTROL_URL)
     ws.onopen = () => ws.send(JSON.stringify({ type: 'workspace:register', path: absPath }))
@@ -538,13 +542,12 @@ const start = defineCommand({
         // Say who owns the running server: a service-managed one is expected
         // to be here, and `moi service` is how to manage it.
         const info = await queryServerInfo()
-        const port = info?.port || PORT
         if (info?.service) {
           console.log(
             '\n' +
               pc.yellow('◆') +
-              ' The moi service is already running on http://localhost:' +
-              port +
+              ' The moi service is already running on ' +
+              webAddress(info) +
               pc.dim(` (v${info.version})`) +
               '\n' +
               pc.dim('  Manage it with `moi service` — restart, logs, uninstall.') +
@@ -552,7 +555,7 @@ const start = defineCommand({
           )
         } else {
           console.log(
-            '\n' + pc.yellow('◆') + ' Server is already running on http://localhost:' + port + '\n'
+            '\n' + pc.yellow('◆') + ' Server is already running on ' + webAddress(info) + '\n'
           )
         }
         process.exit(0)
@@ -611,7 +614,8 @@ const start = defineCommand({
       }
       process.exit(1)
     }
-    console.log(`\n${pc.green('✓')} Server started on http://localhost:${PORT}`)
+    const { unixSocket } = getAppConfig()
+    console.log(`\n${pc.green('✓')} Server started on ${unixSocket ?? `http://localhost:${PORT}`}`)
     console.log(pc.dim('  Press Ctrl+C to stop\n'))
     // Stay alive as the server
   }
@@ -1123,7 +1127,10 @@ const status = defineCommand({
         ' Server is ' +
         pc.bold('running') +
         pc.dim(
-          `  (http port: ${info?.port || PORT}, control port: ${CONTROL_PORT}` +
+          (info?.unixSocket
+            ? `  (web socket: ${info.unixSocket}`
+            : `  (http port: ${info?.port || PORT}`) +
+            `, control port: ${CONTROL_PORT}` +
             (info?.pid ? `, pid: ${info.pid}` : '') +
             ')'
         )
@@ -1220,13 +1227,12 @@ const envSet = defineCommand({
       }
     }
 
-    await updateWorkspaceEnv(entry.path, { set })
-    await notifyEnvChanged(entry.path)
+    const backend = await writeEnv(entry.path, { set })
     for (const key of Object.keys(set)) {
       console.log(pc.green('✓') + ` Set ${pc.bold(key)} ${pc.dim('(custom)')}`)
     }
     // A plaintext fallback should never go unnoticed at write time.
-    if ((await secretBackend()) === 'file') {
+    if (backend === 'file') {
       console.log(pc.dim('  Stored in a 0600 file — OS keychain unavailable.'))
     }
     process.exit(0)
@@ -1240,7 +1246,7 @@ const envUnset = defineCommand({
   },
   async run({ args }) {
     const entry = await resolveCwdWorkspace()
-    const view = await getWorkspaceEnvView(entry.path)
+    const view = await readEnvView(entry.path)
     const byKey = new Map(view.vars.map(v => [v.key, v]))
 
     // Only custom secrets are removable; a dotenv-sourced key lives in its file.
@@ -1265,8 +1271,7 @@ const envUnset = defineCommand({
     }
 
     if (removable.length > 0) {
-      await updateWorkspaceEnv(entry.path, { remove: removable })
-      await notifyEnvChanged(entry.path)
+      await writeEnv(entry.path, { remove: removable })
       for (const key of removable) {
         const v = byKey.get(key)
         const unshadow =
@@ -1311,10 +1316,7 @@ const env = defineCommand({
     const first = rawArgs.find(a => !a.startsWith('-'))
     if (first && Object.hasOwn(envSubCommands, first)) return
     const entry = await resolveCwdWorkspace()
-    // Lazy: required-env pulls the widget/view bundler chain (TS compiler),
-    // which must not load for every other `moi` command's startup.
-    const { requiredEnvFor } = await import('./required-env')
-    const view = await getWorkspaceEnvView(entry.path, requiredEnvFor(entry.path))
+    const view = await readEnvView(entry.path)
     console.log('\n' + renderEnvView(entry, view) + '\n')
     process.exit(0)
   }
@@ -2640,7 +2642,7 @@ function printServiceServer(info: Awaited<ReturnType<typeof queryServerInfo>>) {
     console.log(
       '  server   ' +
         pc.bold(`v${info.version}`) +
-        ` running on http://localhost:${info.port}` +
+        ` running on ${webAddress(info)}` +
         pc.dim(` (pid ${info.pid})`)
     )
     const mismatch = versionMismatchNotice(info.version)
@@ -2844,7 +2846,7 @@ async function runServiceStatus() {
       console.log(
         '  server   ' +
           pc.bold(`v${info.version}`) +
-          pc.dim(` on http://localhost:${info.port} (pid ${info.pid})`)
+          pc.dim(` on ${webAddress(info)} (pid ${info.pid})`)
       )
       if (!info.service) {
         console.log(
@@ -3160,6 +3162,8 @@ function exitIfDemoBlocked(): void {
   const invoked = process.argv[2]
   if (!invoked || invoked === 'version' || invoked === 'start') return
   if (!(invoked in systemCommands)) return
+  // The agent on a managed machine can't read the config (see below).
+  if (!canUseDataDir()) return
   const config = getAppConfig()
   if (!config.cloudDemo) return
   console.log(
@@ -3173,6 +3177,21 @@ function exitIfDemoBlocked(): void {
   process.exit(1)
 }
 
+// Managed machines run the agent as its own OS user, which can't open moi's
+// data folder (docs/config.md). The system commands that set up or
+// run moi belong to the user that runs moi; `version` and `status` only read.
+function exitIfNotMoiUser(): void {
+  const invoked = process.argv[2]
+  if (!invoked || invoked === 'version' || invoked === 'status') return
+  if (!(invoked in systemCommands)) return
+  if (canUseDataDir()) return
+  console.log(
+    '\n' + pc.yellow('◆') + ` moi ${invoked} is only available to the user that runs moi.\n`
+  )
+  process.exit(1)
+}
+
+exitIfNotMoiUser()
 exitIfDemoBlocked()
 
 type HelpCommand = { meta?: unknown }

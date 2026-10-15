@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'path'
+import { isAbsolute, join } from 'path'
 
 import type { ClientAppConfig, ExperimentalFeatures } from '@/lib/types'
 import { EXPERIMENTAL_DEFAULTS } from '@/lib/experimental'
@@ -27,6 +27,16 @@ export type AppConfig = {
   // Cloudflare Access (Zero Trust) in front of this deployment: each viewer
   // inherits the user profile from Access's signed token. Null trusts no proxy.
   cloudflareAccess: CloudflareAccessConfig | null
+  // Managed machines (one per organization) run moi and the agent as
+  // different OS users; see docs/config.md. These three are read
+  // from config.json only, with no env override, so the machine's start
+  // script, which writes the file, is the only thing deciding them.
+  // Folder that `/workspace/create` puts new workspaces in; null is `~/moi`.
+  workspacesDir: string | null
+  // Executable every agent process starts through (see agent-launcher.ts).
+  agentLauncher: string | null
+  // Unix socket file the web side listens on instead of PORT.
+  unixSocket: string | null
 }
 
 export type CloudflareAccessConfig = {
@@ -42,7 +52,10 @@ const DEFAULTS: AppConfig = {
   cloudDemo: false,
   experimental: { ...EXPERIMENTAL_DEFAULTS },
   demoInstallUrl: 'https://moi.computer',
-  cloudflareAccess: null
+  cloudflareAccess: null,
+  workspacesDir: null,
+  agentLauncher: null,
+  unixSocket: null
 }
 
 export const APP_CONFIG_FILE = join(DATA_DIR, 'config.json')
@@ -183,6 +196,12 @@ function fileValues(raw: Record<string, unknown>): Partial<DeploymentConfig> {
   if (raw.demoInstallUrl !== undefined) {
     if (typeof raw.demoInstallUrl === 'string') out.demoInstallUrl = raw.demoInstallUrl
     else warn('ignoring "demoInstallUrl" — expected a string')
+  }
+  for (const key of ['workspacesDir', 'agentLauncher', 'unixSocket'] as const) {
+    const value = raw[key]
+    if (value === undefined || value === null) continue
+    if (typeof value === 'string' && isAbsolute(value)) out[key] = value
+    else warn(`ignoring "${key}" — expected an absolute path`)
   }
   return out
 }

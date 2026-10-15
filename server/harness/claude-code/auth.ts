@@ -1,5 +1,6 @@
 import type { HarnessAvailability, HarnessLogin } from '@/lib/types'
 
+import { agentCommand } from '../../agent-launcher'
 import { resolveWorkspaceEnv } from '../../workspace-env'
 import { findHarnessExecutable } from '../executable'
 
@@ -33,7 +34,7 @@ export async function getClaudeAuthReadiness(workspacePath: string): Promise<Har
   if (!executable) return unavailable('Claude is not installed')
 
   const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
-  const proc = Bun.spawn([executable, 'auth', 'status'], {
+  const proc = Bun.spawn(agentCommand([executable, 'auth', 'status']), {
     cwd: workspacePath,
     env: { ...process.env, ...workspaceEnv },
     stdin: 'ignore',
@@ -58,7 +59,7 @@ export async function startClaudeLogin(workspacePath: string): Promise<HarnessLo
   if (!executable) throw new Error('Claude is not installed')
 
   const workspaceEnv = await resolveWorkspaceEnv(workspacePath)
-  Bun.spawn([executable, 'auth', 'login'], {
+  Bun.spawn(agentCommand([executable, 'auth', 'login']), {
     cwd: workspacePath,
     env: { ...process.env, ...workspaceEnv },
     stdin: 'ignore',

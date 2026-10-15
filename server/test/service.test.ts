@@ -15,7 +15,8 @@ import {
   parseUnitSearchPath,
   rotateServiceLog,
   systemdUnit,
-  type ServiceSpec
+  type ServiceSpec,
+  webAddress
 } from '../service'
 
 let dir: string
@@ -327,5 +328,19 @@ describe('rotateServiceLog', () => {
 
   test('is a no-op when the log does not exist', async () => {
     expect(await rotateServiceLog(join(dir, 'nope.log'))).toBe(false)
+  })
+})
+
+// ---- running-server address -------------------------------------------------
+
+describe('webAddress', () => {
+  const info = { version: '1.0.0', pid: 1, port: 13337, service: false }
+
+  test('is the local URL when the server listens on a port', () => {
+    expect(webAddress(info)).toBe('http://localhost:13337')
+  })
+
+  test('is the socket file when the server listens on one', () => {
+    expect(webAddress({ ...info, unixSocket: '/run/moi/web.sock' })).toBe('/run/moi/web.sock')
   })
 })

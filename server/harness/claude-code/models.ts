@@ -3,6 +3,7 @@ import type { ModelInfo } from '@anthropic-ai/claude-agent-sdk'
 
 import type { Model } from '@/lib/types'
 
+import { claudeCodeSpawn } from '../../agent-launcher'
 import { requireHarnessExecutable } from '../executable'
 import { type ClaudeCli, claudeCliKey, probeClaudeCli } from './cli'
 
@@ -13,6 +14,7 @@ async function fetchClaudeModels(cwd: string, executable: string): Promise<Model
     options: {
       cwd,
       pathToClaudeCodeExecutable: executable,
+      spawnClaudeCodeProcess: claudeCodeSpawn(),
       persistSession: false,
       settingSources: ['user', 'project'],
       env: { ...process.env, CLAUDECODE: undefined }
