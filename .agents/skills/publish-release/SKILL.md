@@ -130,7 +130,8 @@ Recovery, if `verify` fails or the run is rejected:
 ## 6. Verify the published package
 
 1. `npm view moi-computer dist-tags` — the intended tag moved, and for a preview confirm
-   `latest` did **not**.
+   `latest` did **not**. The registry can lag the green `publish` job by a minute or so (the log
+   says "being processed"); an E404 right after success means wait and poll, not a failed release.
 2. `npm view moi-computer@<version> dist.attestations` — trusted publishing attaches provenance
    automatically; its absence means the publish did not go through OIDC.
 3. **Smoke the published package.** This needs the Moi ports to itself: `CONTROL_PORT` defaults to
@@ -147,7 +148,13 @@ Recovery, if `verify` fails or the run is rejected:
      lockfile there. Run it from the repo root (where both already exist and are git-tracked, so
      stray writes are visible) — never from `/tmp` or the scratchpad, where it leaves a junk
      `package.json` behind that will break `bun link` in §8.
-   - `bun install -g moi-computer@<version>`, then `moi version`, `moi env`, `moi start`, and
+   - If §0.4 found a dev link, run `bun unlink` from the repo root **before** the remove.
+     `bun remove -g` alone leaves the link in place, and the install that follows silently keeps
+     running repo source. Confirm `~/.bun/install/global/node_modules/moi-computer` is a real
+     directory, not a symlink, before trusting any smoke result.
+   - `bun install -g moi-computer@<version>`, then `moi version` — it must print the bare version
+     with **no** `(githash)` suffix; a hash means you are still on the dev link. Then `moi env`
+     (run it from inside a registered workspace, or it refuses), `moi start`, and
      curl `/` and `/api/workspaces`. Poke at anything §2.3 flagged as new, if it is quick.
 
 If this fails, publishing cannot be undone cleanly. Unpublish is only possible within 72 hours
