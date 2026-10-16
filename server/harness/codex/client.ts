@@ -20,6 +20,7 @@ import type { WorkspaceActivityPreview } from '../types'
 import { findHarnessExecutable, requireHarnessExecutable } from '../executable'
 import { createCodexTransport, type Json, type NotificationListener } from './transport'
 import { readCodexPages } from './pagination'
+import { listCodexThreads } from './thread-list'
 import { agentCommand } from '../../agent-launcher'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
@@ -263,18 +264,10 @@ export function killAllCodexClients(): void {
 
 // Threads whose recorded cwd is exactly the workspace path, newest first.
 export async function getCodexSessions(workspacePath: string): Promise<SessionSummary[]> {
-  try {
-    const client = await getCodexClient(workspacePath)
-    const threads = await readCodexPages<CodexThread>(client, 'thread/list', {
-      cwd: workspacePath,
-      limit: 100,
-      sortKey: 'updated_at'
-    })
-    return threads.map(codexThreadToSessionInfo)
-  } catch (err) {
-    console.error('[codex] thread/list failed', err)
-    return []
-  }
+  // Startup and listing failures must both preserve the client's cached history.
+  const client = await getCodexClient(workspacePath)
+  const threads = await listCodexThreads(client, workspacePath)
+  return threads.map(codexThreadToSessionInfo)
 }
 
 export async function archiveCodexThread(
@@ -305,12 +298,10 @@ export async function getCodexWorkspacePreview(
   const client = await peekCodexClient(workspacePath)
   if (!client) return {}
   try {
-    const res = await client.rpc<{ data?: CodexThread[] }>('thread/list', {
-      cwd: workspacePath,
-      limit: 50,
-      sortKey: 'updated_at'
-    })
-    return selectCodexWorkspacePreview(res.data ?? [], includeFirstUserMessage)
+    // Every page: agent-created tasks are filtered after listing and could
+    // fill a single page.
+    const threads = await listCodexThreads(client, workspacePath)
+    return selectCodexWorkspacePreview(threads, includeFirstUserMessage)
   } catch {
     return {}
   }
