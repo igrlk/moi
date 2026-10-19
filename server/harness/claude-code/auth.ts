@@ -80,6 +80,7 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
   if (!executable) throw new Error('Claude is not installed')
   const local = getAppConfig().environment === 'local'
   const captureDir = local ? await mkdtemp(join(tmpdir(), 'moi-claude-login-')) : undefined
+  let processExit: Promise<number> | undefined
   try {
     const capturePath = captureDir ? join(captureDir, 'url') : undefined
     const windows = process.platform === 'win32'
@@ -107,7 +108,10 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
       stdout: 'pipe',
       stderr: 'ignore'
     })
-    const completed = proc.exited.then(code => {
+    processExit = proc.exited
+    const completed = processExit.then(async code => {
+      // Windows can still be executing the batch helper after it writes the URL.
+      if (captureDir) await rm(captureDir, { recursive: true, force: true })
       if (code !== 0) throw new Error('Claude sign-in failed or expired. Try again')
     })
     // The process can fail before its URL is available.
@@ -169,6 +173,6 @@ export async function startClaudeLogin(): Promise<HarnessLoginAttempt> {
       clearTimeout(timeout)
     }
   } finally {
-    if (captureDir) await rm(captureDir, { recursive: true, force: true })
+    if (captureDir && !processExit) await rm(captureDir, { recursive: true, force: true })
   }
 }

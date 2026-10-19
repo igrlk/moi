@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 # Cancel superseded runs on the same ref (e.g. rapid PR pushes).
 concurrency:
   group: ci-${{ github.ref }}
@@ -12,13 +15,19 @@ concurrency:
 
 jobs:
   check:
+    name: Checks (Linux)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: oven-sh/setup-bun@v2
+      - name: Checkout repository
+        uses: actions/checkout@v5
         with:
-          bun-version: 1.3.14
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -38,15 +47,39 @@ jobs:
       - name: Test
         run: bun test
 
-  windows-tests:
-    name: Windows tests
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v5
+      - name: Pack and inspect package
+        run: |
+          bun pm pack --filename "$RUNNER_TEMP/moi-computer.tgz"
+          tar -tzf "$RUNNER_TEMP/moi-computer.tgz" > "$RUNNER_TEMP/package-files.txt"
+          grep -q '^package/dist/index.html$' "$RUNNER_TEMP/package-files.txt"
+          if grep -Ei '\.env|secret' "$RUNNER_TEMP/package-files.txt"; then
+            echo "::error::tarball contains sensitive files"
+            exit 1
+          fi
 
-      - uses: oven-sh/setup-bun@v2
+  windows-tests:
+    name: Tests (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
         with:
-          bun-version: 1.3.14
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        id: bun
+        with:
+          bun-version-file: package.json
+
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ steps.bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-${{ steps.bun.outputs.bun-version }}-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

@@ -47,6 +47,7 @@ test('reads the manual URL from CLI output, including terminal hyperlinks', () =
 test('Claude login captures the local callback URL and preserves the cloud code flow', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'moi-auth-cli-'))
   const path = join(dir, 'fake claude.ts')
+  const helperPath = join(dir, 'helper-path')
   const find = spyOn(executable, 'findHarnessExecutable').mockReturnValue(process.execPath)
   const command = spyOn(launcher, 'agentCommand').mockReturnValue([process.execPath, path])
   const appConfig = config.getAppConfig()
@@ -64,6 +65,7 @@ if (process.env.BROWSER !== 'true') {
   await Bun.sleep(200)
   const url = ${JSON.stringify(callbackUrl)}
   const browser = process.env.BROWSER!
+  await Bun.write(${JSON.stringify(helperPath)}, browser)
   const args = process.platform === 'win32'
     ? ['cmd.exe', '/d', '/s', '/c', '""' + browser + '" "%MOI_TEST_CALLBACK_URL%""']
     : [browser, url]
@@ -73,6 +75,9 @@ if (process.env.BROWSER !== 'true') {
     stdout: 'ignore', stderr: 'inherit'
   })
   if (await proc.exited !== 0) process.exit(2)
+  // Windows may still be reading the batch file after its URL has been captured.
+  await Bun.sleep(100)
+  if (!await Bun.file(browser).exists()) process.exit(3)
   if (process.argv[2] === 'automatic') {
     await Bun.sleep(200)
     process.exit(0)
@@ -86,7 +91,7 @@ for await (const chunk of Bun.stdin.stream()) {
 process.exit(code.trim() === 'test-code#test-state' ? 0 : 1)
 `
     )
-    for (const flow of ['local', 'cloud', 'automatic'] as const) {
+    for (const flow of ['local', 'cloud', 'automatic', 'cancelled'] as const) {
       const environment = flow === 'cloud' ? 'cloud' : 'local'
       command.mockReturnValue([process.execPath, path, flow])
       cfg.mockReturnValue({ ...appConfig, environment })
@@ -103,11 +108,17 @@ process.exit(code.trim() === 'test-code#test-state' ? 0 : 1)
           expect(open).not.toHaveBeenCalled()
         }
         expect(login.id).toBeDefined()
-        if (flow !== 'automatic') {
+        if (flow === 'cancelled') {
+          await login.cancel?.()
+          await expect(login.completed).rejects.toThrow('Claude sign-in failed')
+        } else if (flow !== 'automatic') {
           await expect(login.submitCode?.('wrong-state#old')).rejects.toThrow('full code')
           await login.submitCode?.('test-code#test-state')
         }
-        await login.completed
+        if (flow !== 'cancelled') await login.completed
+        if (environment === 'local') {
+          expect(await Bun.file(await Bun.file(helperPath).text()).exists()).toBe(false)
+        }
       } finally {
         await login.cancel?.()
       }

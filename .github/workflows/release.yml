@@ -1,7 +1,6 @@
 name: Release
 
-# Tag push starts the run. `verify` runs immediately; `publish` waits on the
-# `release` environment's required reviewer, which is the single approval link.
+# Verification builds the package; publishing waits for the release reviewer.
 on:
   push:
     tags: ['v*']
@@ -11,92 +10,120 @@ on:
         description: Existing tag to release (e.g. v0.5.0)
         required: true
 
+permissions:
+  contents: read
+
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   verify:
+    name: Verify package
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      artifact_name: npm-package-${{ github.run_attempt }}
+      sha: ${{ steps.meta.outputs.sha }}
+      dist_tag: ${{ steps.meta.outputs.dist_tag }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
 
-      - uses: oven-sh/setup-bun@v2
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version-file: package.json
 
-      - run: bun install --frozen-lockfile
-      - run: bun run lint
-      - run: bun run format:check
-      - run: bun run registry:validate
-      - run: bun run typecheck
-      - run: bun test
-
-      - name: Pack and inspect the tarball
-        # prepack inlines the tldraw license key into the client bundle
-        env:
-          PUBLIC_TLDRAW_LICENSE_KEY: ${{ vars.PUBLIC_TLDRAW_LICENSE_KEY }}
-        run: |
-          rm -f moi-computer-*.tgz
-          bun pm pack
-          # Pin the exact name: a glob matching >1 tarball makes tar read the first as the
-          # archive and the rest as members, and every check below fails against a good build.
-          TGZ=$(ls moi-computer-*.tgz)
-          [ "$(printf '%s\n' "$TGZ" | wc -l)" -eq 1 ] || { echo "::error::expected exactly one tarball, got: $TGZ"; exit 1; }
-          tar -tzf "$TGZ" > files.txt
-          grep -q '^package/dist/' files.txt || { echo "::error::tarball has no dist/"; exit 1; }
-          if grep -Ei '\.env|secret' files.txt; then echo "::error::tarball contains secrets"; exit 1; fi
-
-  publish:
-    needs: verify
-    runs-on: ubuntu-latest
-    # Gates the job on the `release` environment's reviewers, and is also the
-    # environment claim npm's trusted publisher config matches against.
-    environment: release
-    permissions:
-      id-token: write # OIDC token for npm trusted publishing
-      contents: read
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ inputs.tag || github.ref }}
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.14
-
-      # Trusted publishing needs npm >= 11.5.1 on Node >= 22.14.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: npm install -g npm@latest
-
-      - run: bun install --frozen-lockfile
-
-      - name: Resolve tag and dist-tag
+      - name: Validate release tag
         id: meta
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
-          VERSION="${TAG#v}"
-          PKG=$(node -p "require('./package.json').version")
-          [ "$VERSION" = "$PKG" ] || { echo "::error::tag $TAG does not match package.json $PKG"; exit 1; }
+          VERSION=$(bun -p 'require("./package.json").version')
+          [ "$RELEASE_TAG" = "v$VERSION" ] || { echo "::error::release tag does not match package.json"; exit 1; }
           case "$VERSION" in
             *-*) echo "dist_tag=next" >> "$GITHUB_OUTPUT" ;;
             *)   echo "dist_tag=latest" >> "$GITHUB_OUTPUT" ;;
           esac
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      # No NODE_AUTH_TOKEN: npm detects the OIDC environment and mints a
-      # short-lived credential. Provenance is attached automatically.
-      - name: Publish to npm
-        # prepack inlines the tldraw license key into the client bundle. Unset →
-        # keyless build: the Scratchpad works with tldraw's watermark. An expired
-        # key is worse (tldraw blanks the canvas), so delete the variable rather
-        # than leave a dead key in it. See docs/moi-scratchpad.md § License key.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Format check
+        run: bun run format:check
+
+      - name: Validate registry
+        run: bun run registry:validate
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun test
+
+      - name: Pack and inspect package
+        # prepack inlines the public key. See docs/moi-scratchpad.md for key rotation.
         env:
           PUBLIC_TLDRAW_LICENSE_KEY: ${{ vars.PUBLIC_TLDRAW_LICENSE_KEY }}
         run: |
-          [ -n "$PUBLIC_TLDRAW_LICENSE_KEY" ] || echo "::warning::PUBLIC_TLDRAW_LICENSE_KEY is not set, publishing a keyless build (tldraw watermark on the Scratchpad)"
-          npm publish --tag ${{ steps.meta.outputs.dist_tag }}
+          [ -n "$PUBLIC_TLDRAW_LICENSE_KEY" ] || echo "::warning::Building without a tldraw license key; the Scratchpad will show a watermark"
+          bun pm pack --filename "$RUNNER_TEMP/moi-computer.tgz"
+          tar -tzf "$RUNNER_TEMP/moi-computer.tgz" > "$RUNNER_TEMP/package-files.txt"
+          grep -q '^package/dist/index.html$' "$RUNNER_TEMP/package-files.txt"
+          if grep -Ei '\.env|secret' "$RUNNER_TEMP/package-files.txt"; then
+            echo "::error::tarball contains sensitive files"
+            exit 1
+          fi
+
+      - name: Upload verified package
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/moi-computer.tgz
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish package
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Retain the reviewer gate and npm's trusted-publisher environment claim.
+    environment: release
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Set up npm
+        run: npm install -g npm@12.2.0
+
+      - name: Download verified package
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.verify.outputs.artifact_name }}
+          path: ${{ runner.temp }}/npm-package
+
+      # Trusted publishing uses OIDC and attaches provenance automatically.
+      - name: Publish to npm
+        env:
+          DIST_TAG: ${{ needs.verify.outputs.dist_tag }}
+        run: npm publish "$RUNNER_TEMP/npm-package/moi-computer.tgz" --ignore-scripts --tag "$DIST_TAG"
