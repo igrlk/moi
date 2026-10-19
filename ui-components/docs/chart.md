@@ -170,7 +170,7 @@ Introducing **Charts**. A collection of chart components that you can copy and p
 
 Charts are designed to look great out of the box. They work well with the other components and are fully customizable to fit your project.
 
-[Browse the Charts Library](/charts).
+[Browse the Charts Library](https://ui.shadcn.com/charts).
 
 ## Component
 
@@ -697,9 +697,9 @@ export function ChartBarDemoLegend() {
 
 Done. You've built your first chart! What's next?
 
-- [Themes and Colors](/docs/components/chart#theming)
-- [Tooltip](/docs/components/chart#tooltip)
-- [Legend](/docs/components/chart#legend)
+- [Themes and Colors](chart.md#theming)
+- [Tooltip](chart.md#tooltip)
+- [Legend](chart.md#legend)
 
 ## Chart Config
 

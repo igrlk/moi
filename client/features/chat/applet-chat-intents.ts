@@ -16,12 +16,12 @@ import { toast } from '@/client/components/ui/toast'
 import {
   selectedSessionForTab,
   selectedSessionKey
-} from '@/client/features/chat/sessions/useSelectedSession'
+} from '@/client/features/chat/sessions/use-selected-session'
 import { useCollabEnabled } from '@/client/features/collab'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { SelectedSessionScope, WorkspaceSessionSelection, WorkspaceTabId } from '@/lib/types'
-import { useCurrentTabId } from './sessions/useSelectedSession'
-import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+import { useCurrentTabId } from './sessions/use-selected-session'
+import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import type { AgentAvailability } from '@/client/lib/agent-availability'
 
 type UseAppletChatMessageOptions = {

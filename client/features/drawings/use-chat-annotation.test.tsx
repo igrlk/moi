@@ -3,9 +3,9 @@ import { act, useEffect, useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 
-import * as drawing from './useDrawingLayer'
+import * as drawing from './use-drawing-layer'
 import * as attachments from '@/client/features/chat/composer/attachments/draft-attachments'
-import { useChatAnnotation, type ChatAnnotationController } from './useChatAnnotation'
+import { useChatAnnotation, type ChatAnnotationController } from './use-chat-annotation'
 
 let cleanup = async () => {}
 afterEach(() => cleanup())

@@ -9,13 +9,13 @@ import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react
 
 import * as config from '@/client/api/app-config'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import * as events from '@/client/runtime/useWorkspaceEvents'
+import * as events from '@/client/runtime/use-workspace-events'
 import type { WorkspaceAgent, HarnessAvailability } from '@/lib/types'
 import { createUiStore } from '@/client/store/ui'
 import { attachmentKey, liveStore, useLive } from '@/client/features/chat/chat-store'
-import { WorkspaceScreen } from '../WorkspaceScreen'
+import { WorkspaceScreen } from '../workspace-screen'
 import * as workspaceContent from '../workspace-content'
-import { WorkspaceLayoutContext } from '../WorkspaceLayoutContext'
+import { WorkspaceLayoutContext } from '../workspace-layout-context'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { welcomeNewWorkspace } from './workspace-welcome-state'
 

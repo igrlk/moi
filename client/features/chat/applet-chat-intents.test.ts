@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, mock, spyOn } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
-import { selectedSessionKey } from '@/client/features/chat/sessions/useSelectedSession'
+import { selectedSessionKey } from '@/client/features/chat/sessions/use-selected-session'
 import { toast } from '@/client/components/ui/toast'
 import * as appletLog from '@/client/features/applets/applet-log'
 import type { AppletChatMessage } from '@/client/features/applets/applet-runtime'
@@ -10,7 +10,7 @@ import { stageTextAttachment } from './composer/attachments/draft-attachments'
 import type { WorkspaceSessionSelection, UploadInfo } from '@/lib/types'
 import { drainChatDirectives, pushChatDirective } from '@/client/features/workspace/moi-context'
 
-import { canSubmitComposerAction } from '@/client/components/shared/Composer'
+import { canSubmitComposerAction } from '@/client/components/shared/composer'
 import {
   appletSendBlockedReason,
   createAppletMessageHandler

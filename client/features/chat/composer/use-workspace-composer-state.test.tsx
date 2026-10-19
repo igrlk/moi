@@ -4,10 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import * as config from '@/client/api/app-config'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { canSubmitComposerAction } from '@/client/components/shared/Composer'
+import { canSubmitComposerAction } from '@/client/components/shared/composer'
 import type { HarnessAvailability, WorkspaceAgent } from '@/lib/types'
-import * as skills from './useWorkspaceSkillUpdates'
-import { useWorkspaceComposerState } from './useWorkspaceComposerState'
+import * as skills from './use-workspace-skill-updates'
+import { useWorkspaceComposerState } from './use-workspace-composer-state'
 
 function Fixture() {
   const { agentAvailability, composerBanner } = useWorkspaceComposerState('test', {

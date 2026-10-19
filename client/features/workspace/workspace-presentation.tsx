@@ -1,4 +1,4 @@
-import { workspaceProviderIcon } from '@/client/components/shared/WorkspaceIcon'
+import { workspaceProviderIcon } from '@/client/components/shared/workspace-icon'
 import type { DiscoveredWorkspace, WorkspaceEntry, WorkspaceType } from '@/lib/types'
 
 export const workspaceTypeLabel: Record<WorkspaceType, string> = {

@@ -3,7 +3,7 @@ import { act, type ComponentProps } from 'react'
 import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 
-import { CHAT_WELCOME_PROMPTS, ChatEmptyState } from './ChatEmptyState'
+import { CHAT_WELCOME_PROMPTS, ChatEmptyState } from './chat-empty-state'
 
 type EmptyStateProps = ComponentProps<typeof ChatEmptyState>
 

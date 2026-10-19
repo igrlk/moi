@@ -117,7 +117,7 @@ export type ScratchSize = 'm' | 'xl'
 
 // Fill style for rectangles — the UI toolbar's four options. The CLI takes
 // `none|semi|pattern|solid`; ops carry the tldraw DefaultFillStyle value. Note the
-// tldraw quirk (see defaultFills / FILL_OPTIONS in client/components/Scratchpad.tsx):
+// tldraw quirk (see defaultFills / FILL_OPTIONS in client/features/scratchpad/scratchpad-controls.tsx):
 // fill value 'solid' paints the lighter "semi" color, while 'fill' paints the true
 // solid (body === border). Keep the names in sync with that client list.
 export type ScratchFill = 'none' | 'solid' | 'pattern' | 'fill'

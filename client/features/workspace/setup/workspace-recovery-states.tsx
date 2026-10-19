@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { useLocation } from 'wouter'
 import { IconFolderOff } from '@tabler/icons-react'
 
-import { workspaceProviderIcon } from '@/client/components/shared/WorkspaceIcon'
+import { workspaceProviderIcon } from '@/client/components/shared/workspace-icon'
 import { Button } from '@/client/components/ui/button'
 import { Spinner } from '@/client/components/ui/spinner'
 import { workspaceTypeLabel } from '../workspace-presentation'

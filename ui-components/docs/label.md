@@ -23,7 +23,7 @@ export function LabelDemo() {
 ```
 
 <Callout>
-  For form fields, use the [Field](/docs/components/base/field) component which
+  For form fields, use the [Field](field.md) component which
   includes built-in label, description, and error handling.
 </Callout>
 
@@ -81,7 +81,7 @@ import { Label } from '@/components/ui/label'
 
 ## Label in Field
 
-For form fields, use the [Field](/docs/components/base/field) component which
+For form fields, use the [Field](field.md) component which
 includes built-in `FieldLabel`, `FieldDescription`, and `FieldError` components.
 
 ```tsx

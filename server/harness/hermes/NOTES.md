@@ -583,8 +583,8 @@ precedent: `lib/types.ts` (`WorkspaceType` union), `lib/workspace-types.ts`
 `server/harness/executable.ts` (PATH lookup), `server/api/index.ts`
 (`CREATABLE_TYPES`), and a handful of client files that branch on provider
 (`client/features/chat/messages/tool-group/format/index.ts`,
-`client/features/home/workspace-setup/WorkspaceAgentStep.tsx`,
-`client/features/dev/HarnessDebugPage.tsx`).
+`client/features/workspace/setup/workspace-login-state.tsx`,
+`client/features/dev/harness-debug-page.tsx`).
 
 **Effort: comparable to Codex, likely a little less.** ACP is a documented
 standard rather than a reverse-engineered protocol, the semantic tool vocabulary

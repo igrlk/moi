@@ -6,11 +6,11 @@ import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react
 import { Link, Route, Router } from 'wouter'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { selectedSessionKey } from '@/client/features/chat/sessions/useSelectedSession'
+import { selectedSessionKey } from '@/client/features/chat/sessions/use-selected-session'
 import { CollabContext } from '@/client/features/collab/provider'
 import { NO_ENGINE } from '@/client/features/collab/client'
 import { createFakeEngine } from '@/client/features/collab/testing/fake-engine'
-import * as workspaceEvents from '@/client/runtime/useWorkspaceEvents'
+import * as workspaceEvents from '@/client/runtime/use-workspace-events'
 import { resolveUrl } from '@/lib/navigation'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import type {
@@ -19,9 +19,9 @@ import type {
   WorkspaceTabId,
   WorkspaceTabsState
 } from '@/lib/types'
-import { Workspace } from './WorkspaceContext'
-import { WorkspaceLayoutContext } from './WorkspaceLayoutContext'
-import { useWorkspaceNavigation } from './useWorkspaceNavigation'
+import { Workspace } from './workspace-context'
+import { WorkspaceLayoutContext } from './workspace-layout-context'
+import { useWorkspaceNavigation } from './use-workspace-navigation'
 
 let cleanup: () => Promise<void> = async () => {}
 afterEach(() => cleanup())

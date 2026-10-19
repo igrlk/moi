@@ -6,3 +6,5 @@
 - Test UI actions through rendered controls. Invoking component props directly bypasses event wiring and disabled behavior. Static HTML cannot prove layout or that state survives a mounted transition.
 - Keep overlapping coverage when it catches a distinct failure or checks a different integration boundary. Similar cases across harness adapters, persistence, or recovery paths can each be necessary. Remove duplication that adds no such protection.
 - Keep the behavior under test real; mock external boundaries where needed. For a bug fix, verify that the regression test fails without the fix when practical. Avoid elaborate fixtures or new test infrastructure for a small change.
+
+Run `bun run check:repo` for file naming and local Markdown link checks. CI runs it alongside lint, typecheck, and tests. After a rename or deletion, also search for the old path and filename to catch references in comments and code spans.

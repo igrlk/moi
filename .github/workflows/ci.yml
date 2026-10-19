@@ -41,6 +41,9 @@ jobs:
       - name: Validate registry
         run: bun run registry:validate
 
+      - name: Check file naming and documentation links
+        run: bun run check:repo
+
       - name: Typecheck
         run: bun run typecheck
 

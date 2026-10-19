@@ -1,0 +1,272 @@
+import { useState } from 'react'
+
+import { IconChevronRight, IconEggCracked, IconLoader2, IconPlus } from '@tabler/icons-react'
+import { Link, useLocation } from 'wouter'
+
+import { useDiscoveredWorkspaces, useWorkspacePreview, useWorkspaces } from './api'
+import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
+import { ImportWorkspaceDialog } from '@/client/features/workspace/add/import-workspace-dialog'
+import { DemoDialog } from '@/client/features/demo/demo-dialog'
+import { useWorkspaceImport } from '@/client/features/workspace/add/use-workspace-import'
+import { HomeLogo } from './home-logo'
+import { useAppConfig } from '@/client/api/app-config'
+import { AgentBlobatar } from '@/client/components/shared/agent-blobatar'
+import { WorkspaceIcon } from '@/client/components/shared/workspace-icon'
+import { Button } from '@/client/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '@/client/components/ui/collapsible'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
+import { hasRunningWorkspaceActivity, useLive } from '@/client/features/chat/chat-store'
+import { cn } from '@/client/lib/cn'
+import { getWorkspaceThemeStyle, usePreloadWorkspaceFonts } from '@/client/runtime/workspace-theme'
+import { useUiStore } from '@/client/store/ui'
+import {
+  WorkspaceAgentIcons,
+  workspaceDisplayName
+} from '@/client/features/workspace/workspace-presentation'
+import { resolveWorkspaceTheme } from '@/lib/themes'
+import type { DiscoveredWorkspace, WorkspaceEntry } from '@/lib/types'
+import { resolveUrl } from '@/lib/navigation'
+
+import { WorkspacePreview } from './workspace-preview'
+
+export function HomePage() {
+  usePreloadWorkspaceFonts()
+  const [, navigate] = useLocation()
+  const workspacesQuery = useWorkspaces()
+  const discoveredQuery = useDiscoveredWorkspaces()
+  const importFlow = useWorkspaceImport({
+    onSuccess: entry => navigate(`/workspace/${entry.id}`)
+  })
+  const appConfig = useAppConfig()
+  const [promoDialogOpen, setPromoDialogOpen] = useState(false)
+  const discoveredWorkspacesOpen = useUiStore(state => state.discoveredWorkspacesOpen)
+  const setDiscoveredWorkspacesOpen = useUiStore(state => state.setDiscoveredWorkspacesOpen)
+
+  if (workspacesQuery.isPending || discoveredQuery.isPending) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <IconLoader2 size={20} stroke={1.5} className="animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (workspacesQuery.isError || discoveredQuery.isError) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <p className="text-sm text-muted-foreground">Could not load spaces.</p>
+      </div>
+    )
+  }
+
+  const workspaces = workspacesQuery.data
+  const discovered = discoveredQuery.data
+  const count = workspaces.length
+
+  function handleAdd(suggestion: DiscoveredWorkspace) {
+    // Cloud demo: adding workspaces is off — offer the promo dialog instead.
+    if (appConfig.demo) {
+      setPromoDialogOpen(true)
+      return
+    }
+    importFlow.startImport(suggestion)
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-8 pt-14 pb-16">
+      <HomeLogo className="mb-10" />
+
+      {count > 0 ? (
+        <section className="mb-12">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h1 className="text-sm font-medium text-foreground">My workspaces</h1>
+            <CreateWorkspaceDialog
+              trigger={
+                <Button variant="outline" size="sm">
+                  <IconPlus data-icon="inline-start" stroke={1.75} />
+                  New
+                </Button>
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2 md:grid-cols-3">
+            {workspaces.map(workspace => (
+              <WorkspaceCard key={workspace.id} workspace={workspace} />
+            ))}
+          </div>
+        </section>
+      ) : (
+        <div className="mb-10 flex flex-col items-center gap-4 px-8 pt-8 pb-16 text-center">
+          <IconEggCracked size={32} stroke={1.5} className="text-muted-foreground" />
+          <div className="flex flex-col gap-1.5">
+            <h2 className="font-medium">Let’s start with creating your first workspace</h2>
+            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+              Workspace is a place for all the chats, widgets, and views that share the same
+              context. Create a new one or import an existing folder you&rsquo;ve worked in before.
+            </p>
+          </div>
+          <CreateWorkspaceDialog trigger={<Button>Create workspace</Button>} />
+        </div>
+      )}
+
+      {discovered.length > 0 && (
+        <section>
+          <Collapsible
+            open={discoveredWorkspacesOpen}
+            onOpenChange={setDiscoveredWorkspacesOpen}
+            className="group"
+          >
+            <CollapsibleTrigger
+              className={cn(
+                'group/trigger',
+                'flex w-full items-center gap-1 pb-4 text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                'text-muted-foreground group-data-open:text-foreground hover:text-foreground'
+              )}
+            >
+              <span className="text-sm font-medium">Import from this computer</span>
+              <IconChevronRight
+                size={16}
+                stroke={2}
+                className={cn(
+                  'opacity-0 transition-[opacity,transform]',
+                  'group-hover/trigger:opacity-100 group-focus-visible/trigger:opacity-100 group-data-open:rotate-90'
+                )}
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ul className="border-t border-border">
+                {discovered.map(item => (
+                  <SuggestedRow key={item.path} suggestion={item} onAdd={handleAdd} />
+                ))}
+              </ul>
+            </CollapsibleContent>
+          </Collapsible>
+        </section>
+      )}
+
+      {importFlow.choice && (
+        <ImportWorkspaceDialog
+          choice={importFlow.choice}
+          isPending={importFlow.isPending}
+          errorMessage={importFlow.error?.message}
+          onTypeChange={importFlow.selectType}
+          onSubmit={importFlow.submit}
+          onReset={importFlow.reset}
+        />
+      )}
+
+      <DemoDialog open={promoDialogOpen} onOpenChange={setPromoDialogOpen} />
+    </div>
+  )
+}
+
+type WorkspaceCardProps = {
+  workspace: WorkspaceEntry
+}
+
+function WorkspaceCard({ workspace }: WorkspaceCardProps) {
+  // Warm the shared readiness cache before the user enters this workspace.
+  useWorkspaceAgent(workspace.id)
+  const name = workspaceDisplayName(workspace)
+  const previewQuery = useWorkspacePreview(workspace.id)
+  const theme = workspace.theme ?? previewQuery.data?.theme
+  const agent = resolveWorkspaceTheme(theme).agent
+  const running = useLive(state => hasRunningWorkspaceActivity(state.activity, workspace.id))
+  const updatedAt = previewQuery.data?.updatedAt ?? new Date(workspace.addedAt).getTime()
+  const workspaceHref = `/workspace/${workspace.id}`
+
+  return (
+    <div className="group flex min-w-0 flex-col gap-3">
+      <div className="relative">
+        <WorkspacePreview workspaceId={workspace.id} />
+        <Link
+          href={workspaceHref}
+          aria-label={`Open ${name}`}
+          className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
+        {previewQuery.data && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Link
+                  href={resolveUrl('moi:/chat', { workspaceId: workspace.id })}
+                  aria-label={`Chat in ${name}`}
+                  style={getWorkspaceThemeStyle(theme)}
+                  className="absolute right-3 bottom-3 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <AgentBlobatar
+                    preset={agent}
+                    color="primary"
+                    animated={running}
+                    expression={running ? 'thinking' : undefined}
+                    size={48}
+                    className="drop-shadow-sm drop-shadow-primary/20"
+                  />
+                </Link>
+              }
+            />
+            <TooltipContent>Chat</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      <Link
+        href={workspaceHref}
+        className="flex min-w-0 flex-col gap-2 rounded-lg px-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <div
+          className="flex min-w-0 items-center gap-1.5 font-sans"
+          style={getWorkspaceThemeStyle(theme)}
+        >
+          <WorkspaceIcon
+            icon={workspace.icon}
+            workspaceType={workspace.type}
+            workspaceTheme={theme}
+            className="size-4 shrink-0 rounded-xs"
+          />
+          <span className="truncate text-sm font-medium text-foreground">{name}</span>
+        </div>
+        <span className="text-xs text-muted-foreground">{formatUpdatedAt(updatedAt)}</span>
+      </Link>
+    </div>
+  )
+}
+
+type SuggestedRowProps = {
+  suggestion: DiscoveredWorkspace
+  onAdd: (suggestion: DiscoveredWorkspace) => void
+}
+
+function SuggestedRow({ suggestion, onAdd }: SuggestedRowProps) {
+  const { path, types } = suggestion
+  const name = workspaceDisplayName(suggestion)
+  return (
+    <li className="flex items-center gap-2 border-b border-border px-1 py-3">
+      <WorkspaceAgentIcons types={types} />
+      <span className="shrink-0 text-sm font-medium text-foreground">{name}</span>
+      <span title={path} className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+        {suggestion.displayPath ?? path}
+      </span>
+      <Button variant="outline" size="sm" onClick={() => onAdd(suggestion)}>
+        <IconPlus stroke={1.75} />
+        Add
+      </Button>
+    </li>
+  )
+}
+
+function formatUpdatedAt(timestamp: number): string {
+  const ms = Date.now() - timestamp
+  const mins = Math.floor(ms / 60000)
+  if (mins < 1) return 'Updated just now'
+  if (mins < 60) return `Updated ${mins} min${mins === 1 ? '' : 's'} ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `Updated ${hours} hour${hours === 1 ? '' : 's'} ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `Updated ${days} day${days === 1 ? '' : 's'} ago`
+  return `Updated ${new Date(timestamp).toLocaleDateString()}`
+}

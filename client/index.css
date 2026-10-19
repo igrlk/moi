@@ -50,8 +50,8 @@
   --mono: var(--default-mono);
 
   /* Workspace page layout — single source of truth for the widget/chat panel.
-     Read by routes/workspace/[id].tsx; don't hardcode equivalents. (The app
-     sidebar's own widths live in SidebarLayout.tsx.) */
+     Read by features/workspace/workspace-content.tsx; don't hardcode equivalents. (The app
+     sidebar's own widths live in sidebar-layout.tsx.) */
   --page-pad: 2rem; /* padding around the working area */
   --column-w: 40rem; /* grid content width; also the widget area's min before the chat yields */
   --chat-min: 320px; /* docked chat min width — narrower than this and it floats */

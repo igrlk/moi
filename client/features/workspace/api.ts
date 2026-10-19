@@ -5,7 +5,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import { onWorkspaceEventsReconnect, useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
+import {
+  onWorkspaceEventsReconnect,
+  useWorkspaceEvent
+} from '@/client/runtime/use-workspace-events'
 import type {
   WorkspaceAgent,
   WorkspaceLayout,

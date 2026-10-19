@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
 import { useAppletThumbnailRecords, useSaveAppletThumbnails } from '@/client/features/applets/api'
-import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
 import type { AppletKind, AppletThumbnail, AppletThumbnailUpdate } from '@/lib/types'
 import { appletId } from './applet-cache'

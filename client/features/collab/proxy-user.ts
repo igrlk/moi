@@ -1,7 +1,7 @@
 import type { ProxyUserState } from '@/lib/collab/types'
 
 import { requestJson } from '@/client/api/http'
-import { onWorkspaceEventsReconnect } from '@/client/runtime/useWorkspaceEvents'
+import { onWorkspaceEventsReconnect } from '@/client/runtime/use-workspace-events'
 
 import { setProxyUserState } from './host-state'
 

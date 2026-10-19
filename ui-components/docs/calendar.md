@@ -95,7 +95,7 @@ The `Calendar` component is built on top of [React DayPicker](https://react-day-
 
 ## Date Picker
 
-You can use the `<Calendar>` component to build a date picker. See the [Date Picker](/docs/components/base/date-picker) page for more information.
+You can use the `<Calendar>` component to build a date picker. See the [Date Picker](date-picker.md) page for more information.
 
 ## Persian / Hijri / Jalali Calendar
 

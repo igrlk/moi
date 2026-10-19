@@ -1,0 +1,260 @@
+import { type ReactNode } from 'react'
+
+import {
+  IconAlertSquareRoundedFilled,
+  IconMessage2Share,
+  IconPlus,
+  IconSmartHome
+} from '@tabler/icons-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Link, useLocation } from 'wouter'
+
+import { useAppConfig } from '@/client/api/app-config'
+import { useReorderWorkspaces, useWorkspaces } from '@/client/features/home/api'
+import { UpdateButton, useUpdateControl } from '@/client/features/update/update-control'
+import { workspaceKeys } from '@/client/api/workspace-keys'
+import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
+import { CreateWorkspaceDialog } from '@/client/features/workspace/add/create-workspace-dialog'
+import { DemoDialog } from '@/client/features/demo/demo-dialog'
+import { ReorderableList } from '@/client/components/shared/reorderable-list'
+import type { ReorderableRenderState } from '@/client/components/shared/reorderable-list'
+import { WorkspaceIcon } from '@/client/components/shared/workspace-icon'
+import { Button, buttonVariants } from '@/client/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/client/components/ui/tooltip'
+import { workspaceDisplayName } from '@/client/features/workspace/workspace-presentation'
+import { cn } from '@/client/lib/cn'
+import type { WorkspaceEntry } from '@/lib/types'
+
+const FEEDBACK_URL = 'https://mlfrg.notion.site/3c678a44b6788042b734d775dd2e935e?pvs=105'
+
+function sidebarNavButtonClass(active: boolean): string {
+  return cn(
+    buttonVariants({ variant: 'ghost', size: 'icon' }),
+    active && 'bg-accent text-accent-foreground'
+  )
+}
+
+type SidebarLayoutProps = {
+  // Full panel content — the page supplies its own header (compose it with
+  // <PanelHeader>) and body.
+  children?: ReactNode
+  showWorkspaces?: boolean
+}
+
+// App shell: a slim icon rail beside the page content. The page owns the panel's
+// header and body.
+export function SidebarLayout({ children, showWorkspaces = true }: SidebarLayoutProps) {
+  const { data: workspaces } = useWorkspaces()
+
+  // Identity, theme, and registry changes can all alter a workspace's sidebar
+  // presentation. Refetch the list so the sidebar reflects them live. Exact:
+  // `workspaceKeys.all` is the
+  // prefix of every workspace query — a prefix invalidation would refetch
+  // transcripts, widgets, and MCP probes in every connected client.
+  const qc = useQueryClient()
+  useWorkspaceEvent(e => {
+    if (
+      e.type === 'workspace:updated' ||
+      e.type === 'theme:updated' ||
+      e.type === 'workspaces-list:updated'
+    ) {
+      qc.invalidateQueries({ queryKey: workspaceKeys.all, exact: true })
+    }
+  })
+
+  return (
+    <div className="flex h-dvh bg-muted transition-colors duration-100 ease-out motion-reduce:transition-none">
+      <Sidebar workspaces={showWorkspaces ? (workspaces ?? []) : []} />
+      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+    </div>
+  )
+}
+
+type SidebarProps = {
+  workspaces: WorkspaceEntry[]
+}
+
+function Sidebar({ workspaces }: SidebarProps) {
+  const reorder = useReorderWorkspaces()
+
+  return (
+    <TooltipProvider delay={500}>
+      <aside className="flex h-full shrink-0 flex-col items-center gap-4 px-2 py-5 [font-family:var(--default-sans)]">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Link href="/" aria-label="Home" className={sidebarNavButtonClass}>
+                <IconSmartHome stroke={1.5} />
+              </Link>
+            }
+          />
+          <TooltipContent side="right">Home</TooltipContent>
+        </Tooltip>
+
+        <nav className="flex max-h-full min-h-0 w-14 flex-1 flex-col items-center justify-center gap-4">
+          {workspaces.length > 0 && (
+            <>
+              <div className="no-scrollbar min-h-0 scroll-fade overflow-y-auto [--scroll-fade-reveal:16px]">
+                <ReorderableList
+                  items={workspaces}
+                  getId={ws => ws.id}
+                  className="flex flex-col gap-4"
+                  onReorder={ids => reorder.mutate(ids)}
+                  renderPlaceholder={() => (
+                    <div className="pointer-events-none absolute top-0 left-1 size-12 rounded-xl bg-accent" />
+                  )}
+                  renderOverlay={ws => <WorkspaceButton workspace={ws} dragOverlay />}
+                  renderItem={(ws, state) => <WorkspaceButton workspace={ws} dragState={state} />}
+                />
+              </div>
+              <div className="shrink-0">
+                <Tooltip>
+                  <CreateWorkspaceDialog
+                    trigger={
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-lg"
+                            aria-label="Create new workspace"
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <IconPlus data-icon="inline-start" stroke={1.5} />
+                          </Button>
+                        }
+                      />
+                    }
+                  />
+                  <TooltipContent side="right">Create new workspace</TooltipContent>
+                </Tooltip>
+              </div>
+            </>
+          )}
+        </nav>
+
+        <div className="size-8 shrink-0">
+          <SidebarFooterAction />
+        </div>
+      </aside>
+    </TooltipProvider>
+  )
+}
+
+function SidebarFooterAction() {
+  const { demo } = useAppConfig()
+  const updateControl = useUpdateControl()
+
+  if (demo) {
+    return (
+      <DemoDialog
+        trigger={
+          <Button size="icon" aria-label="Unlock all features" title="Unlock all features">
+            <IconAlertSquareRoundedFilled stroke={1.5} />
+          </Button>
+        }
+      />
+    )
+  }
+
+  if (updateControl.status === 'loading') return null
+  if (updateControl.status === 'available') return <UpdateButton {...updateControl.button} />
+
+  return <FeedbackLink />
+}
+
+function FeedbackLink() {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            render={<a href={FEEDBACK_URL} target="_blank" rel="noreferrer" />}
+            variant="ghost"
+            size="icon"
+            aria-label="Leave feedback"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <IconMessage2Share stroke={1.5} />
+          </Button>
+        }
+      />
+      <TooltipContent side="right">Leave feedback</TooltipContent>
+    </Tooltip>
+  )
+}
+
+type WorkspaceButtonProps = {
+  workspace: WorkspaceEntry
+  dragOverlay?: boolean
+  dragState?: ReorderableRenderState
+}
+
+function WorkspaceButton({ workspace, dragOverlay = false, dragState }: WorkspaceButtonProps) {
+  const [location] = useLocation()
+  const href = `/workspace/${workspace.id}`
+  const label = workspaceDisplayName(workspace)
+  // A workspace URL carries a destination (`/workspace/:id/views/orders`), so the
+  // rail matches the workspace segment, not the whole path. The trailing slash
+  // keeps `/workspace/ws1` from lighting up a sibling `/workspace/ws1-other`.
+  const active = location === href || location.startsWith(`${href}/`)
+  const icon = (
+    <div
+      className={cn(
+        buttonVariants({ variant: 'ghost', size: 'icon-lg' }),
+        'pointer-events-none size-12 transition-[border-radius,background-color,color] duration-100 ease-out motion-reduce:transition-none',
+        dragOverlay
+          ? 'bg-background shadow-lg'
+          : 'group-hover:bg-accent group-hover:text-accent-foreground group-focus-visible:ring-3 group-focus-visible:ring-ring/50',
+        active && !dragOverlay && 'bg-accent text-accent-foreground'
+      )}
+    >
+      <WorkspaceIcon
+        icon={workspace.icon}
+        workspaceType={workspace.type}
+        workspaceTheme={workspace.theme}
+        className="size-7 shrink-0 rounded-md transition-[border-radius] duration-100 ease-out motion-reduce:transition-none"
+      />
+    </div>
+  )
+  const labelElement = (
+    <span className="mt-0.5 line-clamp-2 w-full text-center text-[11px] leading-snug font-medium text-ellipsis text-foreground">
+      {label}
+    </span>
+  )
+
+  if (dragOverlay) {
+    return (
+      <span className="flex w-14 flex-col items-center">
+        {icon}
+        {labelElement}
+      </span>
+    )
+  }
+
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      onClick={event => {
+        if (dragState?.isDragging) event.preventDefault()
+      }}
+      className={cn(
+        'group flex w-14 flex-col items-center rounded-xl outline-none',
+        dragState?.isDragging && 'invisible'
+      )}
+      {...dragState?.dragHandleProps}
+    >
+      {icon}
+      <Tooltip>
+        <TooltipTrigger render={labelElement} />
+        <TooltipContent side="right">{label}</TooltipContent>
+      </Tooltip>
+    </Link>
+  )
+}

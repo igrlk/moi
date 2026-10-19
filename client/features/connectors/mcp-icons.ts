@@ -9,7 +9,7 @@
 // all resolve. Claude-hosted MCPs arrive prefixed (`claude.ai Google Drive`) —
 // that prefix is stripped before lookup so the underlying service resolves.
 // Unknown servers fall back to a generic tabler icon — see
-// `client/components/TurnView.tsx`.
+// `client/components/turn-view.tsx`.
 import airtableIcon from '@/client/assets/mcp/airtable.png'
 import apolloIcon from '@/client/assets/mcp/apollo.png'
 import asanaIcon from '@/client/assets/mcp/asana.png'

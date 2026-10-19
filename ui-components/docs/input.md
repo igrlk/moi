@@ -276,7 +276,7 @@ export function InputBadge() {
 
 ## Input Group
 
-To add icons, text, or buttons inside an input, use the `InputGroup` component. See the [Input Group](/docs/components/input-group) component for more examples.
+To add icons, text, or buttons inside an input, use the `InputGroup` component. See the [Input Group](input-group.md) component for more examples.
 
 ```tsx
 import { IconInfoCircle } from '@tabler/icons-react'
@@ -309,7 +309,7 @@ export function InputInputGroup() {
 
 ## Button Group
 
-To add buttons to an input, use the `ButtonGroup` component. See the [Button Group](/docs/components/button-group) component for more examples.
+To add buttons to an input, use the `ButtonGroup` component. See the [Button Group](button-group.md) component for more examples.
 
 ```tsx
 import { Button } from '@/components/ui/button'

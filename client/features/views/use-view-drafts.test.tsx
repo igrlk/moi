@@ -7,7 +7,7 @@ import { useUiStore } from '@/client/store/ui'
 import { composerDraftKey, draftSessionId } from '@/lib/session-drafts'
 import { viewTabId } from '@/lib/workspace-tabs'
 import type { PendingView } from '@/lib/types'
-import { useViewDrafts } from './useViewDrafts'
+import { useViewDrafts } from './use-view-drafts'
 
 let cleanup = async () => {}
 afterEach(() => cleanup())

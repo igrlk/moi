@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react'
 import type { ClientAppConfig } from '@/lib/types'
 import { EXPERIMENTAL_DEFAULTS } from '@/lib/experimental'
 
-import { onWorkspaceEventsReconnect } from '@/client/runtime/useWorkspaceEvents'
+import { onWorkspaceEventsReconnect } from '@/client/runtime/use-workspace-events'
 
 import { requestJson } from './http'
 

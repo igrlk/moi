@@ -3,7 +3,7 @@ import { type ReactNode, useEffect } from 'react'
 import { IconCircleCheckFilled } from '@tabler/icons-react'
 
 import { Button } from '@/client/components/ui/button'
-import { workspaceProviderIcon } from '@/client/components/shared/WorkspaceIcon'
+import { workspaceProviderIcon } from '@/client/components/shared/workspace-icon'
 import { DialogDescription, DialogTitle } from '@/client/components/ui/dialog'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'

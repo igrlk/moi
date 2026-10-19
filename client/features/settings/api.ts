@@ -4,7 +4,7 @@ import { jsonRequest, requestJson, requestVoid } from '@/client/api/http'
 import { WORKSPACE_RESOURCE_OPTIONS } from '@/client/api/query-options'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import type { WorkspaceLayoutResponse } from '@/client/features/workspace/api'
-import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
+import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import type { AppSettings, WorkspaceEntry, WorkspaceEnvView, WorkspaceIcon } from '@/lib/types'
 
 // App-wide settings (server-side settings.json, GET/PATCH /api/settings) —

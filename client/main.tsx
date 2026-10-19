@@ -6,7 +6,7 @@ import { Toaster } from '@/client/components/ui/toast'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { installAppletErrorHook } from '@/client/features/applets/applet-log'
 import { initConnection } from '@/client/features/chat/connection/chat-connection'
-import { AppRouter } from './app/AppRouter'
+import { AppRouter } from './app/app-router'
 
 const queryClient = new QueryClient()
 

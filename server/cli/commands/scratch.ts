@@ -33,7 +33,7 @@ function parseEnd(s: string): ScratchArrowEnd {
 // The Scratchpad palette (matches the UI toolbar's six swatches) and each color's
 // light-theme solid hex — used to snap an arbitrary `--color #rrggbb` to the nearest
 // palette entry (tldraw shapes can't hold free hex). Keep in sync with the swatches
-// in client/features/scratchpad/Scratchpad.tsx.
+// in client/features/scratchpad/scratchpad-controls.tsx.
 const COLOR_HEX: Record<ScratchColor, string> = {
   black: '#1d1d1d',
   red: '#e03131',
@@ -57,7 +57,7 @@ const FONT_SIZE_NAMES = Object.keys(FONT_SIZES)
 
 // Rectangle fills — the UI toolbar's four options. Each user-facing name maps onto a
 // tldraw DefaultFillStyle value (see ScratchFill for tldraw's semi/solid quirk). Keep
-// in sync with FILL_OPTIONS in client/features/scratchpad/Scratchpad.tsx.
+// in sync with FILL_OPTIONS in client/features/scratchpad/scratchpad-controls.tsx.
 const FILL_STYLES: Record<string, ScratchFill> = {
   none: 'none',
   semi: 'solid',

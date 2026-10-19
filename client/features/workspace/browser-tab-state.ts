@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type { WorkspaceTabsState } from '@/lib/types'
 import { normalizeWorkspaceTabs } from '@/lib/workspace-layout'
 import { useCollabEnabled } from '@/client/features/collab'
-import { useWorkspaceLayoutCtx } from './WorkspaceLayoutContext'
+import { useWorkspaceLayoutCtx } from './workspace-layout-context'
 
 const keyFor = (workspaceId: string) => `moi:collab:${workspaceId}:tabs`
 

@@ -13,7 +13,7 @@ import {
   useHarnessAuth,
   type LoginHarness
 } from '@/client/features/harness/api'
-import { workspaceProviderIcon } from '@/client/components/shared/WorkspaceIcon'
+import { workspaceProviderIcon } from '@/client/components/shared/workspace-icon'
 
 import { DeviceLoginSteps } from '@/client/features/harness/device-login-steps'
 import { IconArrowRight } from '@tabler/icons-react'

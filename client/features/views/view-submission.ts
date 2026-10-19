@@ -6,7 +6,7 @@ import {
   readSelectedSession,
   writeSelectedSession
 } from '@/client/features/chat/sessions/browser-tab-state'
-import { selectedSessionKey } from '@/client/features/chat/sessions/useSelectedSession'
+import { selectedSessionKey } from '@/client/features/chat/sessions/use-selected-session'
 import { moveChatDraft } from '@/client/features/chat/chat-send'
 import { liveStore } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'

@@ -6,7 +6,7 @@ import type { ScratchpadWriter } from './types'
 // an older one. When `loadSnapshot`/`migrateStoreSnapshot` fails, these helpers
 // tell "the file is from a newer tldraw" apart from genuine corruption, so both
 // the server error (server/scratchpad/executor.ts) and the client notice
-// (client/features/scratchpad/Scratchpad.tsx) can say something actionable instead of
+// (client/features/scratchpad/scratchpad.tsx) can say something actionable instead of
 // tldraw's bare `migration-error`. See docs/moi-scratchpad.md § Version skew.
 
 // A serialized tldraw schema's migration sequences: sequence id → version, e.g.

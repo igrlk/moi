@@ -393,7 +393,7 @@ const layoutRaceAnswer = turn('assistant', 4, 3, [
       '| 0.9s | — | edits grid |',
       '| 1.5s | — | PUT stale layout |',
       '',
-      'The fix is persisting the value captured at call time instead of reading the cache when the debounce fires — see [WorkspaceLayoutContext.tsx](https://github.com/molefrog/moi):',
+      'The fix is persisting the value captured at call time instead of reading the cache when the debounce fires — see [workspace-layout-context.tsx](https://github.com/molefrog/moi):',
       '',
       '```ts',
       'timer.current = setTimeout(() => {',

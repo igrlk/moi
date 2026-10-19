@@ -9,16 +9,16 @@ import {
   IconSketching
 } from '@tabler/icons-react'
 
-import { DrawingLayer } from '@/client/features/drawings/DrawingLayer'
-import { DrawingToolbar } from '@/client/features/drawings/DrawingToolbar'
-import { useChatAnnotation } from '@/client/features/drawings/useChatAnnotation'
-import { ChatPanel } from '@/client/features/chat/ChatPanel'
-import type { WelcomeDestination } from '@/client/features/chat/messages/ChatEmptyState'
-import { ChatPopup } from '@/client/features/chat/ChatPopup'
-import { ThemePanel } from '@/client/features/workspace/ThemePanel'
-import { Overview } from '@/client/features/overview/Overview'
+import { DrawingLayer } from '@/client/features/drawings/drawing-layer'
+import { DrawingToolbar } from '@/client/features/drawings/drawing-toolbar'
+import { useChatAnnotation } from '@/client/features/drawings/use-chat-annotation'
+import { ChatPanel } from '@/client/features/chat/chat-panel'
+import type { WelcomeDestination } from '@/client/features/chat/messages/chat-empty-state'
+import { ChatPopup } from '@/client/features/chat/chat-popup'
+import { ThemePanel } from '@/client/features/workspace/theme-panel'
+import { Overview } from '@/client/features/overview/overview'
 import { WorkspaceUsersMenu } from '@/client/features/collab'
-import { PanelHeader } from '@/client/components/shared/PanelHeader'
+import { PanelHeader } from '@/client/components/shared/panel-header'
 import { Button } from '@/client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import { toast } from '@/client/components/ui/toast'
@@ -26,36 +26,36 @@ import {
   useAppletChatMessage,
   useAppletChatAttachment
 } from '@/client/features/chat/applet-chat-intents'
-import { useChat } from '@/client/features/chat/useChat'
-import { usePinnedSession } from '@/client/features/chat/sessions/useSelectedSession'
+import { useChat } from '@/client/features/chat/use-chat'
+import { usePinnedSession } from '@/client/features/chat/sessions/use-selected-session'
 import {
   PendingViewScreen,
   type PendingViewHandle
-} from '@/client/features/views/PendingViewScreen'
-import { ViewManager } from '@/client/features/views/ViewManager'
+} from '@/client/features/views/pending-view-screen'
+import { ViewManager } from '@/client/features/views/view-manager'
 import { getViewIcon, getViewLabel } from '@/client/features/views/view-presentation'
-import { useViewActions } from '@/client/features/views/useViewActions'
-import { useViewDrafts } from '@/client/features/views/useViewDrafts'
-import { useFitsSplitLayout } from '@/client/features/workspace/useFitsSplitLayout'
-import { useWorkspaceComposerState } from '@/client/features/chat/composer/useWorkspaceComposerState'
+import { useViewActions } from '@/client/features/views/use-view-actions'
+import { useViewDrafts } from '@/client/features/views/use-view-drafts'
+import { useFitsSplitLayout } from '@/client/features/workspace/use-fits-split-layout'
+import { useWorkspaceComposerState } from '@/client/features/chat/composer/use-workspace-composer-state'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import {
   hasRunningWorkspaceActivity,
   isSessionRunning,
   useLive
 } from '@/client/features/chat/chat-store'
-import { useWorkspaceLayoutCtx } from '@/client/features/workspace/WorkspaceLayoutContext'
-import { WorkspaceMenu } from '@/client/features/workspace/WorkspaceMenu'
+import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
+import { WorkspaceMenu } from '@/client/features/workspace/workspace-menu'
 import { effectiveOpenTabs, tabAvailable } from '@/client/features/workspace/tab-resolution'
-import { useWorkspaceNavigation } from '@/client/features/workspace/useWorkspaceNavigation'
+import { useWorkspaceNavigation } from '@/client/features/workspace/use-workspace-navigation'
 import { cn } from '@/client/lib/cn'
-import { useWorkspaceEvent } from '@/client/runtime/useWorkspaceEvents'
+import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import { useUiStore } from '@/client/store/ui'
 import {
   type CreateWorkspaceTabItem,
   type WorkspaceTabItem,
   WorkspaceTabs
-} from '@/client/features/workspace/WorkspaceTabs'
+} from '@/client/features/workspace/workspace-tabs'
 import { isDefaultWidget } from '@/lib/default-widgets'
 import { composerDraftKey, draftSessionId } from '@/lib/session-drafts'
 import type {
@@ -68,11 +68,11 @@ import type {
 } from '@/lib/types'
 import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 
-import { WorkspaceSplitLayout } from './WorkspaceSplitLayout'
-import { UnavailablePage } from './UnavailablePage'
+import { WorkspaceSplitLayout } from './workspace-split-layout'
+import { UnavailablePage } from './unavailable-page'
 
 const Scratchpad = lazy(() =>
-  import('@/client/features/scratchpad/Scratchpad').then(module => ({
+  import('@/client/features/scratchpad/scratchpad').then(module => ({
     default: module.Scratchpad
   }))
 )

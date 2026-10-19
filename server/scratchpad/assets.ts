@@ -11,7 +11,7 @@ import type { ScratchpadDoc } from './document'
 // `asset:<sha256>.<ext>` — a tldraw-valid src protocol — pointing at a file in
 // `.moi/.scratchpad/` (a hidden sidecar dir next to `.moi/.scratchpad.json`,
 // moi-internal like the snapshot itself). The browser uploads/resolves through
-// the `/scratchpad/assets` routes (see its TLAssetStore in Scratchpad.tsx); the
+// the `/scratchpad/assets` routes (see its TLAssetStore in scratchpad.tsx); the
 // server's `add image` writes files directly; `read-image` reads them back.
 //
 // Content addressing (the file name is the sha256 of the bytes) buys dedup —

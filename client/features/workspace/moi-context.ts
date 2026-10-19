@@ -25,7 +25,7 @@
 import { useCallback } from 'react'
 
 import { useViews } from '@/client/features/views/api'
-import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import type { AppletContext, MoiContext } from '@/lib/moi-context'
 import type { ViewInfo, WorkspaceTabId } from '@/lib/types'
 

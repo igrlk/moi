@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { CompiledView } from '@/lib/types'
 import { DEFAULT_VIEWS_WIDGET, isDefaultWidget, type DefaultWidgetId } from '@/lib/default-widgets'
 
-import { ViewsWidget } from './ViewsWidget'
+import { ViewsWidget } from './views-widget'
 
 export type DefaultWidgetRenderContext = {
   views: CompiledView[]

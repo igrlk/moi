@@ -2,7 +2,7 @@
 
 The Scratchpad is a shared tldraw canvas in each workspace. Its server code lives
 in `server/scratchpad/`; the browser editor is
-`client/features/scratchpad/Scratchpad.tsx`, and CLI commands live in
+`client/features/scratchpad/scratchpad.tsx`, and CLI commands live in
 `server/cli/commands/scratch.ts`.
 
 ## Persistence

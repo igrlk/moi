@@ -8,7 +8,7 @@ import {
   selectedSessionForTab,
   selectedSessionKey,
   settleSelectedSessionSave
-} from '@/client/features/chat/sessions/useSelectedSession'
+} from '@/client/features/chat/sessions/use-selected-session'
 import type { SessionInfo, WorkspaceSessionSelection, WorkspaceTabsState } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { workspaceKeys } from '@/client/api/workspace-keys'

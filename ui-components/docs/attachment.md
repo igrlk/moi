@@ -664,7 +664,7 @@ A container for one or more actions, aligned to the end of the attachment.
 
 ### AttachmentAction
 
-An action button. Renders a [`Button`](/docs/components/button) and accepts all of its props.
+An action button. Renders a [`Button`](button.md) and accepts all of its props.
 
 | Prop       | Type                                  | Default     | Description                              |
 | ---------- | ------------------------------------- | ----------- | ---------------------------------------- |

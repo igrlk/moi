@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react'
 
-import { WorkspaceIcon } from '@/client/components/shared/WorkspaceIcon'
+import { WorkspaceIcon } from '@/client/components/shared/workspace-icon'
 import { InlineInput } from '@/client/components/ui/inline-input'
 import { cn } from '@/client/lib/cn'
 

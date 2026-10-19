@@ -12,10 +12,10 @@ import {
   selectedSessionOptions,
   usePinnedSession,
   useSelectedSession
-} from './useSelectedSession'
+} from './use-selected-session'
 import { useCollabEnabled } from '@/client/features/collab'
 import { useLatestRef } from '@/client/lib/use-latest-ref'
-import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
+import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import type {
   SessionConfig,
   SessionInfo,

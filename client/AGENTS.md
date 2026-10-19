@@ -12,6 +12,8 @@ Before editing host-app UI, read `../DESIGN.md` and the relevant rules in `../.a
 
 ## Conventions
 
+- Follow the [repo file naming rules](../AGENTS.md#file-naming-and-references): component, hook, and test filenames use kebab-case.
+
 - UI components in `components/ui/` are host facades over the shared Moi registry components built on Base UI React. Local compatibility copies explain why they cannot re-export yet.
 - `lib/cn.ts` is `clsx` + `tailwind-merge`.
 
