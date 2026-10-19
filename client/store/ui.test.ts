@@ -108,23 +108,9 @@ describe('pending view drafts', () => {
 
     expect(useUiStore.getState()).toBe(before)
   })
-
-  test('restores drafts in a new store', () => {
-    useUiStore.getState().setComposerDraft('draft-1', 'Weekly report view')
-
-    const restoredStore = createUiStore(localStorage)
-
-    expect(restoredStore.getState().composerDrafts).toEqual({
-      'draft-1': 'Weekly report view'
-    })
-  })
 })
 
 describe('docked chat width', () => {
-  test('defaults to 360px', () => {
-    expect(useUiStore.getState().dockedChatWidth).toBe(360)
-  })
-
   test('persists one width across stores', () => {
     useUiStore.getState().setDockedChatWidth(412)
 

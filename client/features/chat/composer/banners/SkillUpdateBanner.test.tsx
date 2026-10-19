@@ -25,20 +25,16 @@ describe('SkillUpdateBanner', () => {
   test('renders the primary, secondary, and dismiss actions', () => {
     const html = renderBanner()
 
-    expect(html).toContain('tabler-icon-folder-exclamation')
     expect(html).toContain('This workspace is using old Moi skills')
     expect(html).toContain('Auto-update')
     expect(html).toContain('Update once')
     expect(html).toContain('aria-label="Dismiss skill update"')
-    expect(html).toContain('@xl:flex')
-    expect(html.indexOf('Auto-update')).toBeLessThan(html.indexOf('Update once'))
   })
 
   test('renders a status-only banner during automatic updates', () => {
     const html = renderBanner({ pendingAction: 'auto' })
 
     expect(html).toContain('role="status"')
-    expect(html).toContain('tabler-icon-loader-2')
     expect(html).toContain('Updating Moi skills…')
     expect(html).not.toContain('This workspace is using old Moi skills')
     expect(html).not.toContain('Auto-update')

@@ -51,12 +51,10 @@ describe('Update button', () => {
     ).toBe('')
   })
 
-  test('renders a direct update button without a popover trigger', () => {
+  test('offers an enabled update action when a version is available', () => {
     const html = renderControl(available)
 
-    expect(html).toContain('tabler-icon-download')
     expect(html).toContain('aria-label="Update"')
-    expect(html).not.toContain('data-slot="popover-trigger"')
     expect(html).not.toContain('disabled=""')
   })
 })

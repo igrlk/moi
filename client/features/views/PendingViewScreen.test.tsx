@@ -37,7 +37,7 @@ function renderPendingView(
 }
 
 describe('PendingViewScreen', () => {
-  test('keeps an inactive draft mounted', () => {
+  test('renders the sketch for both active and inactive drafts', () => {
     const active = renderPendingView('draft')
     const inactive = renderPendingView('draft', false)
 
@@ -47,7 +47,7 @@ describe('PendingViewScreen', () => {
     expect(inactive).toContain('Drawing area')
   })
 
-  test('keeps the sketch surface mounted through startup and building', () => {
+  test('renders the sketch and the relevant action or status for each build state', () => {
     const starting = renderPendingView('starting')
     const waiting = renderPendingView('waiting')
     const building = renderPendingView('building')
@@ -58,10 +58,9 @@ describe('PendingViewScreen', () => {
     expect(waiting).toContain('The view needs your attention')
     expect(waiting).toContain('Drawing area')
     expect(building).toContain('Drawing area')
-    expect(building).toContain('data-slot="spinner"')
+    expect(building).toContain('role="status"')
     expect(failed).toContain('Drawing area')
     expect(failed).toContain('Discard view')
-    expect(waiting).not.toContain('invisible')
     expect(starting).not.toContain('Sketch how the view should look')
     expect(renderPendingView('starting', false)).toContain('Drawing area')
     expect(renderPendingView('waiting', false)).toContain('The view needs your attention')

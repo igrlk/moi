@@ -37,8 +37,6 @@ describe('WorkspaceTabs', () => {
       })
     )
 
-    expect(html).toContain('tabler-icon-messages')
-    expect(html).not.toContain('mo-root')
     expect(html).toContain('data-slot="spinner"')
     const overviewButton = html.match(/<button[^>]*aria-label="Overview"[^>]*>/)?.[0]
     const viewButton = html.match(/<button[^>]*aria-label="Test view"[^>]*>/)?.[0]

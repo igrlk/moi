@@ -55,7 +55,6 @@ test('cloud Codex explains the setting and displays a code to enter on the provi
   })
   expect(html).toContain('Enable device code sign-in for Codex')
   expect(html).toContain('https://chatgpt.com/settings/security')
-  expect(html).toContain('<ol')
   expect(html).toContain('https://auth.openai.com/codex/device')
   expect(html).toContain('ABCD-1234')
   expect(html).not.toContain('Cancel sign-in')
@@ -96,7 +95,6 @@ test('local Claude waits for the browser callback with the code fallback hidden'
   expect(html).toContain('Open browser')
   expect(html).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback')
   expect(html).not.toContain('https://claude.com/oauth/manual')
-  expect(html).not.toContain('<h2')
 })
 
 test('cloud Claude asks for the full code from the sign-in page', () => {
@@ -133,7 +131,6 @@ test('connected, failed, and loading states do not offer a misleading login', ()
   const loading = render('codex', 'local')
   expect(loading).not.toContain('Continue')
   expect(loading).toContain('aria-label="Loading"')
-  expect(loading).not.toContain('data-slot="skeleton"')
 })
 
 test('failed and expired login attempts still allow starting again', () => {

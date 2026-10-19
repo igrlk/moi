@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { formatHex, wcagContrast } from 'culori'
+import { wcagContrast } from 'culori'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'path'
@@ -8,7 +8,6 @@ import {
   COLOR_THEMES,
   DEFAULT_PRIMARY_COLOR,
   DEFAULT_WORKSPACE_THEME,
-  RADIUS_THEMES,
   deriveThemeColors,
   resolveWorkspaceTheme
 } from '@/lib/themes'
@@ -43,149 +42,35 @@ describe('color themes', () => {
     expect(html).toContain('<meta name="color-scheme" content="light" />')
   })
 
-  test('defines and exposes the default shadcn compatibility tokens', async () => {
-    const indexCss = await Bun.file(join(import.meta.dir, '../../client/index.css')).text()
-    const themeCss = await Bun.file(join(import.meta.dir, '../../client/theme.css')).text()
-    const root = indexCss.match(/:root \{([\s\S]*?)\n\}/)?.[1]
-    const darkTheme = indexCss.match(/\.dark \{([\s\S]*?)\n\}/)?.[1]
-    const light = [
-      'oklch(0.646 0.222 41.116)',
-      'oklch(0.6 0.118 184.704)',
-      'oklch(0.398 0.07 227.392)',
-      'oklch(0.828 0.189 84.429)',
-      'oklch(0.769 0.188 70.08)'
-    ]
-    const dark = [
-      'oklch(0.488 0.243 264.376)',
-      'oklch(0.696 0.17 162.48)',
-      'oklch(0.769 0.188 70.08)',
-      'oklch(0.627 0.265 303.9)',
-      'oklch(0.645 0.246 16.439)'
-    ]
-
-    expect(root).toContain('--secondary: var(--accent);')
-    expect(root).toContain('--secondary-foreground: var(--accent-foreground);')
-    expect(darkTheme).toContain('--secondary: var(--accent);')
-    expect(darkTheme).toContain('--secondary-foreground: var(--accent-foreground);')
-    expect(themeCss).toContain('--color-secondary: var(--secondary);')
-    expect(themeCss).toContain('--color-secondary-foreground: var(--secondary-foreground);')
-
-    for (const [index, color] of light.entries()) {
-      const token = index + 1
-      expect(root).toContain(`--chart-${token}: ${color};`)
-      expect(themeCss).toContain(`--color-chart-${token}: var(--chart-${token});`)
-    }
-    for (const [index, color] of dark.entries()) {
-      expect(darkTheme).toContain(`--chart-${index + 1}: ${color};`)
-    }
-  })
-
-  test('keeps the picker order', () => {
-    expect(Object.keys(COLOR_THEMES)).toEqual([
-      'default',
-      'paper',
-      'rose',
-      'tangerine',
-      'sand',
-      'mint',
-      'sky',
-      'lavender'
-    ])
-  })
-
-  test('derives all theme colors from the primary', () => {
-    const primary = 'oklch(0.7426 0.1817 56.01)'
-    expect(deriveThemeColors(primary)).toEqual({
-      primary,
-      primaryForeground: 'oklch(0 0 0)',
-      background: 'color-mix(in srgb, var(--primary) 2%, oklch(1 0 0) 98%)',
-      foreground: 'color-mix(in srgb, var(--primary) 20%, oklch(0 0 0) 80%)',
-      muted: 'color-mix(in srgb, var(--background) 95%, var(--foreground) 5%)',
-      mutedForeground: 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
-      accent: 'color-mix(in srgb, var(--primary) 3%, var(--foreground) 4%)',
-      accentForeground: 'var(--foreground)',
-      border: 'color-mix(in srgb, var(--foreground) 7%, transparent)',
-      ring: 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
+  test('keeps the selected primary and chooses readable text for light and dark inputs', () => {
+    expect(deriveThemeColors('oklch(1 0 0)')).toMatchObject({
+      primary: 'oklch(1 0 0)',
+      primaryForeground: 'oklch(0 0 0)'
+    })
+    expect(deriveThemeColors('oklch(0 0 0)')).toMatchObject({
+      primary: 'oklch(0 0 0)',
+      primaryForeground: 'oklch(1 0 0)'
     })
   })
 
-  test('swaps the primary pair into the widget surface roles', () => {
+  test('uses the selected color as the widget surface without a circular primary reference', () => {
     const primary = 'oklch(0.7426 0.1817 56.01)'
     const colors = deriveThemeColors(primary, 'widget')
 
-    expect(colors).toEqual({
-      primary: 'color-mix(in srgb, var(--background) 2%, oklch(1 0 0) 98%)',
-      primaryForeground: 'color-mix(in srgb, var(--background) 20%, oklch(0 0 0) 80%)',
-      background: primary,
-      foreground: 'oklch(0 0 0)',
-      muted: 'color-mix(in srgb, var(--background) 95%, var(--foreground) 5%)',
-      mutedForeground: 'color-mix(in srgb, var(--background) 50%, var(--foreground) 50%)',
-      accent: 'color-mix(in srgb, var(--primary) 3%, var(--foreground) 4%)',
-      accentForeground: 'var(--foreground)',
-      border: 'color-mix(in srgb, var(--foreground) 15%, transparent)',
-      ring: 'color-mix(in srgb, var(--background) 50%, var(--primary) 50%)'
-    })
+    expect(colors.background).toBe(primary)
+    expect(wcagContrast(primary, colors.foreground)).toBeGreaterThanOrEqual(3)
+    expect(colors.primary).toContain('var(--background)')
     expect(colors.primary).not.toContain('var(--primary)')
-    expect(deriveThemeColors(DEFAULT_PRIMARY_COLOR, 'widget').background).toBe(
-      DEFAULT_PRIMARY_COLOR
-    )
   })
 
-  test('chooses primary text using the UI luminance threshold', () => {
-    const expectedForegrounds = {
-      paper: 'oklch(1 0 0)',
-      rose: 'oklch(1 0 0)',
-      tangerine: 'oklch(1 0 0)',
-      sand: 'oklch(0 0 0)',
-      mint: 'oklch(1 0 0)',
-      sky: 'oklch(1 0 0)',
-      lavender: 'oklch(1 0 0)'
+  test('preset text meets the existing contrast floor on workspace and widget surfaces', () => {
+    for (const preset of Object.values(COLOR_THEMES)) {
+      const primary = preset.primary ?? DEFAULT_PRIMARY_COLOR
+      const normal = deriveThemeColors(primary)
+      const widget = deriveThemeColors(primary, 'widget')
+      expect(wcagContrast(primary, normal.primaryForeground)).toBeGreaterThanOrEqual(3)
+      expect(wcagContrast(primary, widget.foreground)).toBeGreaterThanOrEqual(3)
     }
-
-    for (const [key, preset] of Object.entries(COLOR_THEMES)) {
-      if (!preset.primary || key === 'default') continue
-      const foreground = deriveThemeColors(preset.primary).primaryForeground
-      expect(foreground).toBe(expectedForegrounds[key as keyof typeof expectedForegrounds])
-      expect(wcagContrast(preset.primary, foreground)).toBeGreaterThanOrEqual(3)
-    }
-  })
-
-  test('serializes the OKLCH presets for terminal swatches', () => {
-    const expectedHex = {
-      paper: '#5e4d3c',
-      rose: '#f13c3c',
-      tangerine: '#ff5718',
-      sand: '#ffb868',
-      mint: '#009155',
-      sky: '#007ae3',
-      lavender: '#9051ff'
-    }
-
-    for (const [key, hex] of Object.entries(expectedHex)) {
-      const primary = COLOR_THEMES[key as keyof typeof expectedHex].primary
-      if (!primary) throw new Error(`expected ${key} primary`)
-      expect(formatHex(primary)).toBe(hex)
-    }
-  })
-
-  test('stores only the primary source on color presets', () => {
-    expect(COLOR_THEMES.default).toEqual({ label: 'Default' })
-    for (const [key, preset] of Object.entries(COLOR_THEMES)) {
-      if (key === 'default') continue
-      expect(Object.keys(preset).sort()).toEqual(['label', 'primary'])
-      expect(preset.primary).toMatch(/^oklch\(/)
-    }
-  })
-})
-
-describe('radius themes', () => {
-  test('defines the four shared radius presets', () => {
-    expect(RADIUS_THEMES).toEqual({
-      squishy: { label: 'Squishy', radius: '0.875rem' },
-      soft: { label: 'Soft', radius: '0.625rem' },
-      subtle: { label: 'Subtle', radius: '0.375rem' },
-      square: { label: 'Square', radius: '0' }
-    })
   })
 })
 

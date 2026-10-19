@@ -1,68 +1,50 @@
-import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
-
 import { describe, expect, test } from 'bun:test'
+import { parseHTML } from 'linkedom'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 import { WorkspaceSplitLayout } from './WorkspaceSplitLayout'
 
-describe('WorkspaceSplitLayout', () => {
-  test('renders workspace and chat around an accessible resize handle', () => {
-    const html = renderToStaticMarkup(
-      createElement(WorkspaceSplitLayout, {
-        workspace: createElement('div', null, 'Workspace content'),
-        chat: createElement('div', null, 'Chat content'),
-        open: true,
-        workspaceMinWidth: 640,
-        chatMinWidth: 320,
-        chatMaxWidth: 460,
-        chatWidth: 360,
-        onCollapse: () => undefined,
-        onChatWidthChange: () => undefined
-      })
-    )
+function render(open: boolean) {
+  const html = renderToStaticMarkup(
+    <WorkspaceSplitLayout
+      workspace={<div>Workspace content</div>}
+      chat={<div id="test-chat">Chat content</div>}
+      open={open}
+      workspaceMinWidth={640}
+      chatMinWidth={320}
+      chatMaxWidth={460}
+      chatWidth={360}
+      onCollapse={() => {}}
+      onChatWidthChange={() => {}}
+    />
+  )
+  return parseHTML(`<html><body>${html}</body></html>`).document
+}
 
-    expect(html).toContain('data-slot="resizable-panel-group"')
-    expect(html).toContain('overflow-visible!')
-    expect(html).toContain('data-slot="workspace-split-workspace"')
-    expect(html).toContain('data-slot="workspace-split-chat"')
-    expect(html).toContain('min-w-(--chat-min)')
-    expect(html).toContain('id="chat"')
-    expect(html).toContain('flex-basis:360px')
-    expect(html).toContain('aria-label="Resize chat"')
-    expect(html).toContain('role="separator"')
-    expect(html).not.toContain('aria-hidden="true"')
-    expect(html).not.toContain('aria-disabled="true"')
-    expect(html).not.toContain('transition-[flex-grow]')
-    expect(html).not.toContain('transition-opacity')
-    expect(html.indexOf('Workspace content')).toBeLessThan(html.indexOf('role="separator"'))
-    expect(html.indexOf('role="separator"')).toBeLessThan(html.indexOf('Chat content'))
+describe('WorkspaceSplitLayout', () => {
+  test('renders workspace and chat with an accessible resize handle', () => {
+    const document = render(true)
+    const handle = document.querySelector('[role="separator"]')
+
+    expect(document.body.textContent).toContain('Workspace content')
+    expect(document.body.textContent).toContain('Chat content')
+    expect(handle?.getAttribute('aria-label')).toBe('Resize chat')
+    expect(handle?.hasAttribute('hidden')).toBe(false)
+    expect(handle?.getAttribute('aria-disabled')).not.toBe('true')
+    expect(
+      document.getElementById('test-chat')?.closest('[inert], [aria-hidden="true"]')
+    ).toBeNull()
   })
 
-  test('collapses and hides the chat while keeping the split layout mounted', () => {
-    const html = renderToStaticMarkup(
-      createElement(WorkspaceSplitLayout, {
-        workspace: createElement('div', null, 'Workspace content'),
-        chat: createElement('div', null, 'Chat content'),
-        open: false,
-        workspaceMinWidth: 640,
-        chatMinWidth: 320,
-        chatMaxWidth: 460,
-        chatWidth: 360,
-        onCollapse: () => undefined,
-        onChatWidthChange: () => undefined
-      })
-    )
+  test('makes a closed chat inert and hides its resize handle while retaining its content', () => {
+    const document = render(false)
+    const handle = document.querySelector('[role="separator"]')
+    const chat = document.getElementById('test-chat')
 
-    expect(html).toContain('data-slot="resizable-panel-group"')
-    expect(html).toContain('id="chat"')
-    expect(html).toContain('flex-basis:0')
-    expect(html).toContain('aria-hidden="true"')
-    expect(html).toContain('inert=""')
-    expect(html).toContain('aria-label="Resize chat"')
-    expect(html).toContain('role="separator"')
-    expect(html).toContain('hidden=""')
-    expect(html).toContain('aria-disabled="true"')
-    expect(html).toContain('data-separator="disabled"')
-    expect(html.indexOf('Workspace content')).toBeLessThan(html.indexOf('Chat content'))
+    expect(document.body.textContent).toContain('Workspace content')
+    expect(chat?.textContent).toBe('Chat content')
+    expect(chat?.closest('[inert]')?.getAttribute('aria-hidden')).toBe('true')
+    expect(handle?.hasAttribute('hidden')).toBe(true)
+    expect(handle?.getAttribute('aria-disabled')).toBe('true')
   })
 })

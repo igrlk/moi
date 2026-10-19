@@ -36,6 +36,10 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 
 `DESIGN.md` is the canonical design guidance for the main app frontend. Before editing host app UI in `client/` (`*.tsx` or `*.css`), read `DESIGN.md` together with `client/AGENTS.md` and the relevant `.agents/rules/` files. It applies to the app shell, chat, settings, menus, workspace list, tabs, panels, and host widget/view chrome. It does **not** govern workspace widget/view internals or generated applets; use workspace-local design guidance for those.
 
+## Tests
+
+Read [TESTING.md](TESTING.md) when deciding what test coverage a change needs.
+
 ## Commands
 
 - `bun run dev` — Start the dev server on port 13337 (alias for `bun server/cli.ts start --dev`).

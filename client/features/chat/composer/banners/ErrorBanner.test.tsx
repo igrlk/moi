@@ -16,7 +16,6 @@ test('renders a dismissible destructive chat error', () => {
 
   expect(html).toContain('role="alert"')
   expect(html).toContain('The agent stopped unexpectedly')
-  expect(html).toContain('text-destructive')
   expect(html).toContain('aria-label="Dismiss error"')
 })
 

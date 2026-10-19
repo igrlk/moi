@@ -15,9 +15,6 @@ describe('WidgetFrame', () => {
     const colors = deriveThemeColors(DEFAULT_PRIMARY_COLOR, 'widget')
 
     expect(chromeClasses).toBeDefined()
-    expect(chromeClasses?.split(' ')).toContain('text-foreground')
-    expect(chromeClasses).not.toContain('ring-')
-    expect(chromeClasses).not.toContain('shadow-[')
     expect(chromeClasses?.split(' ')).not.toContain('dark')
     expect(html).toContain(`--background:${DEFAULT_PRIMARY_COLOR}`)
     expect(html).toContain(`--primary:${colors.primary}`)

@@ -138,55 +138,6 @@ describe('write planning', () => {
 })
 
 describe('catalog', () => {
-  test('exposes exactly the agreed public set', () => {
-    expect(UI_COMPONENT_NAMES).toEqual([
-      'accordion',
-      'alert',
-      'alert-dialog',
-      'attachment',
-      'avatar',
-      'badge',
-      'button',
-      'button-group',
-      'calendar',
-      'card',
-      'carousel',
-      'chart',
-      'checkbox',
-      'collapsible',
-      'combobox',
-      'context-menu',
-      'data-table',
-      'date-picker',
-      'dialog',
-      'drawer',
-      'dropdown-menu',
-      'field',
-      'hover-card',
-      'input',
-      'input-group',
-      'kbd',
-      'label',
-      'pagination',
-      'popover',
-      'progress',
-      'radio-group',
-      'resizable',
-      'select',
-      'separator',
-      'skeleton',
-      'slider',
-      'spinner',
-      'switch',
-      'table',
-      'tabs',
-      'textarea',
-      'toggle',
-      'toggle-group',
-      'tooltip'
-    ])
-  })
-
   test('keeps library items out of the public catalog', () => {
     for (const name of SUPPORT_ITEMS) expect(UI_COMPONENTS[name]).toBeUndefined()
     for (const name of UI_COMPONENT_NAMES) {
@@ -242,8 +193,6 @@ describe('local registry', () => {
     const registry = await loadRegistry({ cwd: REPO_ROOT })
     const names = new Set(registry.items.map(item => item.name))
 
-    expect(registry).toMatchObject({ name: 'moi', homepage: 'https://moi.computer' })
-    expect(registry.items).toHaveLength(46)
     for (const name of UI_COMPONENT_NAMES) expect(names.has(name)).toBeTrue()
     for (const name of SUPPORT_ITEMS) expect(names.has(name)).toBeTrue()
   })

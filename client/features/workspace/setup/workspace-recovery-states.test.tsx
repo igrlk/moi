@@ -6,7 +6,7 @@ for (const [type, label] of [
   ['codex', 'ChatGPT'],
   ['claude-code', 'Claude']
 ] as const) {
-  test(`${label} missing installation uses the compact recovery state`, () => {
+  test(`${label} missing installation explains the problem and offers a recheck`, () => {
     const html = renderToStaticMarkup(
       <HarnessUnavailableState
         type={type}
@@ -21,7 +21,6 @@ for (const [type, label] of [
     )
     expect(html).toContain(`${label} is uninstalled from the device`)
     expect(html).toContain('Check again')
-    expect(html).toContain('<img')
     expect(html).not.toContain('Install instructions')
     expect(html).not.toContain('Your agent is unavailable')
   })

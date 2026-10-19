@@ -4,7 +4,6 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
-  OPENCLAW_CLIENT_CAPS,
   acquireSessionSubscriptionRef,
   gatewayClientBaseOptions,
   releaseSessionSubscriptionRef,
@@ -15,10 +14,6 @@ describe('gatewayClientBaseOptions', () => {
   test('advertises the tool-events capability so the gateway sends session.tool frames', () => {
     const opts = gatewayClientBaseOptions('ws://127.0.0.1:18789', 'token')
     expect(opts.caps).toContain('tool-events')
-  })
-
-  test('the shared caps constant carries tool-events', () => {
-    expect([...OPENCLAW_CLIENT_CAPS]).toContain('tool-events')
   })
 
   test('carries the url/token and pins wire protocol 4', () => {

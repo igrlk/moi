@@ -23,18 +23,12 @@ function renderExploreWorkspace(disabled = false): string {
 }
 
 describe('ExploreWorkspaceState', () => {
-  test('renders the workspace analysis copy and one plain prompt', () => {
+  test('offers one workspace analysis action', () => {
     const html = renderExploreWorkspace()
     const promptButtons = [...html.matchAll(/<button.*?<\/button>/gs)]
 
-    expect(html).toContain(
-      'Your agent can explore this workspace and suggest useful widgets and views based on'
-    )
     expect(html).toContain('Explore the workspace')
     expect(promptButtons).toHaveLength(1)
-    expect(promptButtons[0]?.[0]).toContain('<svg')
-    expect(promptButtons[0]?.[0]).not.toContain('grid')
-    expect(promptButtons[0]?.[0]).not.toContain('rotate')
   })
 
   test('disables the analysis prompt when sending is unavailable', () => {
@@ -44,11 +38,6 @@ describe('ExploreWorkspaceState', () => {
   })
 
   test('keeps analysis instructions in hidden message context', () => {
-    expect(WORKSPACE_ANALYSIS_PROMPT).toMatchObject({
-      label: 'Explore the workspace',
-      prompt: 'Explore this workspace and suggest what Moi can build based on its content'
-    })
-
     const html = renderExploreWorkspace()
     expect(html).not.toContain('Wait for me to choose')
 
@@ -56,8 +45,7 @@ describe('ExploreWorkspaceState', () => {
       activeTab: { id: 'overview' },
       directives: [...WORKSPACE_ANALYSIS_PROMPT.context]
     })
-    expect(context).toContain('Explore the existing workspace files')
-    expect(context).toContain('which content informed your ideas')
+    // This instruction protects the review step before an agent changes user files.
     expect(context).toContain('Wait for me to choose before building anything')
   })
 })

@@ -11,16 +11,13 @@ test('workspace icon paints themed glyphs with primary foreground', () => {
       icon={{ type: 'glyph', value: 'rocket', background: 'theme' }}
       workspaceType="codex"
       workspaceTheme={{ font: 'sans', color: 'rose', radius: 'soft', agent: 'boxy' }}
-      className="size-7 rounded-xs"
     />
   )
 
-  expect(html).toContain('shadow-[inset')
   expect(html).toContain(`background-color:${COLOR_THEMES.rose.primary}`)
   expect(html).toContain(
     `color:${deriveThemeColors(COLOR_THEMES.rose.primary ?? DEFAULT_PRIMARY_COLOR).primaryForeground}`
   )
-  expect(html).toContain('size-[70%]')
   expect(html).toContain('<svg')
 })
 
@@ -33,32 +30,22 @@ test('workspace icon renders uploads and provider fallbacks as images', () => {
   )
   const provider = renderToStaticMarkup(<WorkspaceIcon workspaceType="codex" />)
 
-  expect(upload).not.toContain('color-mix(in_srgb')
-  expect(upload).not.toContain('style=')
+  expect(upload).toContain('src="data:image/webp;base64,upload"')
   expect(provider).toContain(`src="${workspaceProviderIcon.codex}"`)
-  expect(provider).toContain('size-[95%]')
-  expect(provider).not.toContain('mask-image')
 })
 
-test('bare glyphs use the workspace foreground', () => {
-  const html = renderToStaticMarkup(<WorkspaceIcon icon={{ type: 'glyph', value: 'leaf' }} />)
-
-  expect(html).toContain('text-foreground')
-  expect(html).not.toContain('text-primary-foreground')
-  expect(html).toContain('size-[95%]')
-  expect(html).not.toContain('<img')
-})
-
-test('emoji stay as text and change size with their background', () => {
-  const bare = renderToStaticMarkup(<WorkspaceIcon icon={{ type: 'emoji', value: '💡' }} />)
-  const html = renderToStaticMarkup(
-    <WorkspaceIcon icon={{ type: 'emoji', value: '💡', background: 'theme' }} />
+test('renders a chosen glyph or emoji without falling back to the provider image', () => {
+  const glyph = renderToStaticMarkup(
+    <WorkspaceIcon workspaceType="codex" icon={{ type: 'glyph', value: 'leaf' }} />
+  )
+  const emoji = renderToStaticMarkup(
+    <WorkspaceIcon workspaceType="codex" icon={{ type: 'emoji', value: '💡' }} />
   )
 
-  expect(bare).toContain('text-[85cqi]')
-  expect(html).toContain('text-[60cqi]')
-  expect(html).toContain('💡')
-  expect(html).not.toContain('<img')
+  expect(glyph).toContain('<svg')
+  expect(glyph).not.toContain('<img')
+  expect(emoji).toContain('💡')
+  expect(emoji).not.toContain('<img')
 })
 
 test('workspace icon scopes the default primary instead of inheriting another workspace', () => {

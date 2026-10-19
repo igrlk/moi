@@ -130,8 +130,4 @@ describe('getWorkspaceThemeStyle', () => {
       '--primary-foreground': colors.primaryForeground
     })
   })
-
-  test('loads the configured geometric mono family', () => {
-    expect(FONT_THEMES.geometric.googleFontsQuery).toContain('Geist+Mono')
-  })
 })

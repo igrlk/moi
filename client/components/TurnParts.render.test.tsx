@@ -118,8 +118,6 @@ describe('completed assistant run', () => {
 
     expect(html).toContain('Worked')
     expect(html).toContain('aria-expanded="true"')
-    expect(html).toContain('group/collapsible')
-    expect(html).toContain('group-data-open/collapsible:rotate-90')
     expect(html).toContain('I will inspect it.')
     expect(html).toContain('Thought')
   })

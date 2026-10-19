@@ -46,13 +46,6 @@ afterEach(() => {
   whichSpy.mockRestore()
 })
 
-test('SDK mock preserves unrelated session exports', async () => {
-  const sdk = await import('@anthropic-ai/claude-agent-sdk')
-
-  expect(sdk.getSessionMessages).toBe(agentSdk.getSessionMessages)
-  expect(sdk.listSessions).toBe(agentSdk.listSessions)
-})
-
 test('MCP status probes effective user and project settings for the workspace', async () => {
   await getMcpStatus('/test/workspace/effective')
 

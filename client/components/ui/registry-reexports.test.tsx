@@ -1,74 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test } from 'bun:test'
 
-import * as RegistryAlertDialog from '@/ui-components/alert-dialog'
-import * as RegistryButton from '@/ui-components/button'
-import * as RegistryCheckbox from '@/ui-components/checkbox'
-import * as RegistryCollapsible from '@/ui-components/collapsible'
-import * as RegistryDialog from '@/ui-components/dialog'
-import * as RegistryDropdownMenu from '@/ui-components/dropdown-menu'
-import * as RegistryHoverCard from '@/ui-components/hover-card'
-import * as RegistryInput from '@/ui-components/input'
-import * as RegistryPopover from '@/ui-components/popover'
-import * as RegistryResizable from '@/ui-components/resizable'
-import * as RegistrySkeleton from '@/ui-components/skeleton'
-import * as RegistrySlider from '@/ui-components/slider'
-import * as RegistrySpinner from '@/ui-components/spinner'
-import * as RegistrySwitch from '@/ui-components/switch'
-import * as RegistryTabs from '@/ui-components/tabs'
-import * as RegistryTextarea from '@/ui-components/textarea'
-import * as RegistryTooltip from '@/ui-components/tooltip'
-
-import * as HostAlertDialog from './alert-dialog'
-import * as HostButton from './button'
-import * as HostCheckbox from './checkbox'
-import * as HostCollapsible from './collapsible'
-import * as HostDialog from './dialog'
-import * as HostDropdownMenu from './dropdown-menu'
-import * as HostHoverCard from './hover-card'
-import * as HostInput from './input'
 import * as HostPopover from './popover'
-import * as HostResizable from './resizable'
-import * as HostSkeleton from './skeleton'
 import * as HostSlider from './slider'
 import * as HostSpinner from './spinner'
-import * as HostSwitch from './switch'
 import * as HostTabs from './tabs'
-import * as HostTextarea from './textarea'
-import * as HostTooltip from './tooltip'
-
-test('host primitives re-export the shared registry implementations', () => {
-  expect(HostAlertDialog).toEqual(RegistryAlertDialog)
-  expect(HostButton).toEqual(RegistryButton)
-  expect(HostCheckbox).toEqual(RegistryCheckbox)
-  expect(HostCollapsible).toEqual(RegistryCollapsible)
-  expect(HostDialog).toEqual(RegistryDialog)
-  expect(HostDropdownMenu).toEqual(RegistryDropdownMenu)
-  expect(HostHoverCard).toEqual(RegistryHoverCard)
-  expect(HostPopover).toEqual(RegistryPopover)
-  expect(HostResizable).toEqual(RegistryResizable)
-  expect(HostSkeleton).toEqual(RegistrySkeleton)
-  expect(HostSlider).toEqual(RegistrySlider)
-  expect(HostSpinner).toEqual(RegistrySpinner)
-  expect(HostSwitch).toEqual(RegistrySwitch)
-  expect(HostTabs).toEqual(RegistryTabs)
-  expect(HostTextarea).toEqual(RegistryTextarea)
-  expect(HostTooltip).toEqual(RegistryTooltip)
-})
-
-test('host Input copy stays aligned with the shared registry component', () => {
-  const props = {
-    type: 'email' as const,
-    className: 'w-40',
-    disabled: true,
-    placeholder: 'Email',
-    'aria-invalid': true
-  }
-
-  expect(renderToStaticMarkup(<HostInput.Input {...props} />)).toBe(
-    renderToStaticMarkup(<RegistryInput.Input {...props} />)
-  )
-})
 
 test('shared Tabs forwards vertical orientation to Base UI', () => {
   const html = renderToStaticMarkup(

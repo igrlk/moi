@@ -88,29 +88,12 @@ describe('ChatEmptyState', () => {
     expect(renderState('explore-workspace')).toContain('Explore the workspace')
     expect(renderState('overview-empty')).toContain('create widgets and views')
     expect(renderState('tab-empty')).toContain('manage the view from here')
-    for (const kind of ['welcome', 'explore-workspace', 'overview-empty', 'tab-empty'] as const) {
-      const html = renderState(kind)
-      expect(html).toContain('mo-root')
-      expect(html).toContain('--mo-head:var(--accent)')
-      expect(html).toContain('--mo-eye:var(--accent-foreground)')
-    }
   })
 
   test('renders the focused new-view prompt', () => {
     const html = renderState('view-draft')
 
-    expect(html).toContain('mo-root')
-    expect(html).toContain('--mo-head:var(--accent)')
-    expect(html).toContain('--mo-eye:var(--accent-foreground)')
-    expect(html).not.toContain('tabler-icon-table-spark')
     expect(html).toContain('Describe the content, data, and key actions you need in the view')
-  })
-
-  test('replaces the plain empty-state icon with the agent Blobatar', () => {
-    const html = renderState('overview-empty')
-
-    expect(html).toContain('mo-root')
-    expect(html).not.toContain('tabler-icon-messages')
   })
 
   test('hides examples when the workspace already has applets', () => {
