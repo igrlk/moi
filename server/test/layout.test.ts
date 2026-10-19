@@ -6,8 +6,13 @@ import { tmpdir } from 'node:os'
 import { DEFAULT_VIEWS_WIDGET } from '@/lib/default-widgets'
 import type { AppletKind, WorkspaceLayout } from '@/lib/types'
 
-import { getLayoutPath, getWorkspacePreview, loadLayout, mergeLayoutForSave } from '../layout'
-import { getThumbnailsDir } from '../thumbnails'
+import {
+  getLayoutPath,
+  getWorkspacePreview,
+  loadLayout,
+  mergeLayoutForSave
+} from '../workspaces/layout'
+import { getThumbnailsDir } from '../applets/thumbnails'
 
 // The grid editor and `moi config` write the same `.workspace.json`. A layout
 // PUT is authoritative for the editor fields but must NOT touch identity

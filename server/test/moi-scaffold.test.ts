@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'path'
 
 import { syncAppletDeclarations } from '../applets/declarations'
-import { ensureMoiGitignore, scaffoldMoiDir } from '../moi-scaffold'
+import { ensureMoiGitignore, scaffoldMoiDir } from '../workspaces/scaffold'
 import { silenceConsole } from './quiet'
 
 // The scaffold backstop: `scaffoldMoiDir` must refuse to create a `.moi/` inside
@@ -142,7 +142,7 @@ describe('dependency install diagnostics', () => {
       while [ ! -f "$MOI_TEST_INSTALL_RELEASE" ]; do /bin/sleep 0.01; done
       echo "error after parent exit" >&2
     `)
-    const source = join(import.meta.dir, '..', 'moi-scaffold.ts')
+    const source = join(import.meta.dir, '..', 'workspaces', 'scaffold.ts')
     const proc = Bun.spawn(
       [
         process.execPath,

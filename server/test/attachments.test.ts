@@ -10,7 +10,7 @@ import { ClaudeAdapter } from '../harness/claude-code/adapter'
 import type { Part } from '@/lib/format'
 
 import { buildUserMessage as toClaudeMessage } from '../harness/claude-code/session'
-import { prepareAttachmentMessage } from '../attachment-message'
+import { prepareAttachmentMessage } from '../sessions/attachment-message'
 import { splitAttachments } from '@/lib/moi-attachments'
 import type { StoredUpload } from '../uploads'
 

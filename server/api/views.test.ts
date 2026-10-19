@@ -12,23 +12,27 @@ import { DATA_DIR } from '../data-dir'
 import { setEventServer } from '../events'
 import { codexHarness } from '../harness/codex'
 import { getClientFrameLog } from '../harness/debug'
-import { loadLayout, saveLayout } from '../layout'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
-import { listPendingViews, createPendingView, setPendingViewStorePath } from '../pending-views'
-import { buildAllViews, handleBundleViews, updateViewTitle } from '../views'
+import { loadLayout, saveLayout } from '../workspaces/layout'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
+import {
+  listPendingViews,
+  createPendingView,
+  setPendingViewStorePath
+} from '../sessions/pending-views'
+import { buildAllViews, handleBundleViews, updateViewTitle } from '../applets/views'
 import {
   DEFAULT_SESSION_STORE_PATH,
   getSessionRecord,
   patchSessionRecord,
   setSessionStorePath
-} from '../session-store'
+} from '../sessions/store'
 import {
   DEFAULT_SELECTED_SESSION_PATH,
   getWorkspaceSessionSelection,
   pinSession,
   saveSelectedSession,
   setSelectedSessionPath
-} from '../selected-session'
+} from '../sessions/selected'
 import { silenceConsole } from '../test/quiet'
 
 silenceConsole('log')

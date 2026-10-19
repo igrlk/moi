@@ -1,0 +1,134 @@
+// Skill versioning for a workspace's installed skill copy drifting behind the
+// version this moi installation ships. The marker in each skill's `SKILL.md`
+// drives both the CLI status and the frontend's automatic update check.
+import { readdir } from 'node:fs/promises'
+import { join } from 'node:path'
+
+import type { WorkspaceSkillStatus, WorkspaceType } from '@/lib/types'
+
+import { findWorkspaceForPath, liftToWorkspaceRoot, listWorkspaces } from '../workspaces/registry'
+import { BUNDLED_SKILLS_DIR } from './template'
+import { skillsDirFor } from '../workspaces/init'
+
+// The version is stamped as a self-contained marker in SKILL.md, e.g.
+// `<moi-skill version="0.1.0" />`, rather than in YAML frontmatter. SKILL.md
+// frontmatter is NOT reliably strict YAML — the free-text `description` routinely
+// contains `: ` and other tokens that make real parsers reject the block — so a
+// controlled, unambiguous marker we own is both simpler and more robust than
+// scraping the frontmatter. Returns `null` when the file or marker is missing.
+const VERSION_MARKER = /<moi-skill\b[^>]*\bversion="([^"]+)"/
+
+export async function readSkillVersion(skillMdPath: string): Promise<string | null> {
+  const file = Bun.file(skillMdPath)
+  if (!(await file.exists())) return null
+  const m = (await file.text()).match(VERSION_MARKER)
+  return m ? m[1] : null
+}
+
+// Bun.semver (built-in: `order` + `satisfies`) isn't in this repo's bun-types
+// yet, so reach it through a narrow typed view rather than `any`.
+const semver = (
+  Bun as unknown as {
+    semver: {
+      order(a: string, b: string): -1 | 0 | 1
+      satisfies(v: string, range: string): boolean
+    }
+  }
+).semver
+
+function isValidVersion(v: string): boolean {
+  try {
+    semver.order(v, v)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Compare an installed version against the bundled one with Bun's semver.
+// `behind` = bundled is strictly newer; `minorBehind` = that gap is at least a
+// minor bump (patch gaps stay silent). `~installed` spans installed's whole
+// major.minor, so a bundled version outside it is a minor-or-major bump. A
+// missing/invalid installed counts as behind (legacy or broken stamp → prompt);
+// a missing/invalid bundled never does (don't nag on our own broken ship).
+function compare(
+  installed: string | null,
+  bundled: string | null
+): { behind: boolean; minorBehind: boolean } {
+  if (!bundled || !isValidVersion(bundled)) return { behind: false, minorBehind: false }
+  if (!installed || !isValidVersion(installed)) return { behind: true, minorBehind: true }
+  const behind = semver.order(installed, bundled) < 0
+  return { behind, minorBehind: behind && !semver.satisfies(bundled, `~${installed}`) }
+}
+
+// Bundled is a MINOR-or-major release ahead — surfaced to the agent. Patch bumps
+// stay silent and ride along on the next minor update.
+export const isMinorBehind = (installed: string | null, bundled: string | null): boolean =>
+  compare(installed, bundled).minorBehind
+
+// Any difference at all, patch included — decides whether `moi skill update`
+// would change anything and whether the frontend should offer or run it.
+export const isBehind = (installed: string | null, bundled: string | null): boolean =>
+  compare(installed, bundled).behind
+
+// Skills shipped with this CLI — directory names under the bundled skills dir.
+export async function bundledSkillNames(): Promise<string[]> {
+  try {
+    const entries = await readdir(BUNDLED_SKILLS_DIR, { withFileTypes: true })
+    return entries.filter(e => e.isDirectory()).map(e => e.name)
+  } catch {
+    return []
+  }
+}
+
+// Per-skill installed-vs-bundled versions for a workspace root. `type` picks
+// the installed-skills location (OpenClaw keeps them in `skills/`, not
+// `.claude/skills/`) — pass the registry entry's type when known.
+export async function skillStatuses(
+  workspaceRoot: string,
+  type?: WorkspaceType
+): Promise<WorkspaceSkillStatus[]> {
+  const names = await bundledSkillNames()
+  const skillsDir = skillsDirFor(workspaceRoot, type)
+  return Promise.all(
+    names.map(async name => ({
+      name,
+      bundled: await readSkillVersion(join(BUNDLED_SKILLS_DIR, name, 'SKILL.md')),
+      installed: await readSkillVersion(join(skillsDir, name, 'SKILL.md'))
+    }))
+  )
+}
+
+export type ResolvedWorkspace = { root: string; type?: WorkspaceType }
+
+// Resolve a path to its workspace root: the registered workspace that owns it
+// (carrying its backend type), else lifted out of any `.moi/`, else the path
+// itself. Mirrors how `moi bundle` resolves a target so `moi skill` works from
+// the same places.
+export async function resolveWorkspace(cwd: string): Promise<ResolvedWorkspace> {
+  const ws = findWorkspaceForPath(await listWorkspaces(), cwd)
+  if (ws) return { root: ws.path, type: ws.type }
+  return { root: liftToWorkspaceRoot(cwd) }
+}
+
+export async function resolveWorkspaceRoot(cwd: string): Promise<string> {
+  return (await resolveWorkspace(cwd)).root
+}
+
+// One-line, agent-facing notice when any installed skill is a minor+ behind the
+// bundled version — else `null`. Other commands append it to their output so
+// the agent reading that output knows to run `moi skill update`. Never throws:
+// version checks must not break the command they ride on.
+export async function staleSkillNotice(cwd: string): Promise<string | null> {
+  try {
+    const { root, type } = await resolveWorkspace(cwd)
+    const stale = (await skillStatuses(root, type)).filter(s =>
+      isMinorBehind(s.installed, s.bundled)
+    )
+    if (stale.length === 0) return null
+    const parts = stale.map(s => `${s.name} (${s.installed ?? 'none'} → ${s.bundled})`)
+    return `⚠ Moi skill outdated: ${parts.join(', ')} — run \`moi skill update\` to refresh.`
+  } catch {
+    return null
+  }
+}

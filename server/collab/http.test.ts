@@ -8,7 +8,7 @@ import type { WorkspaceEntry } from '@/lib/types'
 
 import { api } from '../api'
 import { clientAppConfig, initializeAppConfig, resetAppConfig } from '../app-config'
-import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../registry'
+import { DEFAULT_REGISTRY_PATH, setRegistryPath } from '../workspaces/registry'
 import { collabManager, type ClientSocket } from './manager'
 import { collabSkillReferencePath } from './skill'
 

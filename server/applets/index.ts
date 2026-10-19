@@ -21,7 +21,7 @@ import { analyzeDependencies, resolveSource, scanSources } from './dependencies'
 import type { AppletKind } from './build-applet'
 import { buildAppletsInChild } from './build-worker'
 import { APPLET_API_BASE_SENTINEL } from './api-base'
-import { pruneAppletThumbnails } from '../thumbnails'
+import { pruneAppletThumbnails } from './thumbnails'
 
 export { scanSources } from './dependencies'
 
@@ -263,7 +263,7 @@ const FS_MEDIA_RE =
 // extension. The workspace holds secrets (`.env`, `.moi/`) and the routes built
 // on this are unauthenticated — these guards are the protection, not the
 // localhost bind. Shared by the raw stream (`serveWorkspaceFile`) and the image
-// preview route (server/preview.ts).
+// preview route (server/workspaces/preview.ts).
 export function resolveWorkspaceMediaFile(workspaceRoot: string, tail: string): string | Response {
   let rel: string
   try {

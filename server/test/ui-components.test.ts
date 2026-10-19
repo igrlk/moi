@@ -14,7 +14,7 @@ import {
   resolveUiComponentRequest,
   suggestUiComponents,
   uiComponentFiles
-} from '../ui-components'
+} from '../applets/ui-components'
 
 const REPO_ROOT = join(import.meta.dir, '../..')
 const SUPPORT_ITEMS = ['scoped-portal', 'utils']

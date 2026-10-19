@@ -11,7 +11,7 @@ import {
   setSecretStoreBackend,
   setWorkspaceEnvStorePath,
   updateWorkspaceEnv
-} from '../workspace-env'
+} from '../workspaces/env'
 
 let wsDir: string
 let storeDir: string

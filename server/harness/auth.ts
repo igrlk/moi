@@ -7,7 +7,7 @@ import type {
   WorkspaceType
 } from '@/lib/types'
 
-import { listWorkspaces } from '../registry'
+import { listWorkspaces } from '../workspaces/registry'
 import { publishEvent } from '../events'
 import { harnessFor } from './registry'
 import type { HarnessWorkspace, HarnessLoginAttempt } from './types'

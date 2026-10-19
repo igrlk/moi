@@ -14,8 +14,8 @@ import {
 } from '@/lib/themes'
 import type { WorkspaceLayout, WorkspaceTheme } from '@/lib/types'
 
-import { loadLayout, saveLayout } from '../layout'
-import { applyThemeUpdate } from '../theme'
+import { loadLayout, saveLayout } from '../workspaces/layout'
+import { applyThemeUpdate } from '../workspaces/theme'
 
 describe('color themes', () => {
   test('keeps the default primary source aligned with the root theme', async () => {

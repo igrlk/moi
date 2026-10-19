@@ -15,7 +15,7 @@
 // data dir, keyed by workspace path then session id:
 //   { "<workspacePath>": ["<sessionId>", …] }
 // Path (not registry id) is the key so the list survives re-registration, the
-// same choice session-config.ts makes.
+// same choice server/sessions/config.ts makes.
 import { mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 

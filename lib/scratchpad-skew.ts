@@ -5,8 +5,8 @@ import type { ScratchpadWriter } from './types'
 // down-migrations — a snapshot written by a newer schema can never be loaded by
 // an older one. When `loadSnapshot`/`migrateStoreSnapshot` fails, these helpers
 // tell "the file is from a newer tldraw" apart from genuine corruption, so both
-// the server error (scratchpad-executor.ts) and the client notice
-// (client/components/Scratchpad.tsx) can say something actionable instead of
+// the server error (server/scratchpad/executor.ts) and the client notice
+// (client/features/scratchpad/Scratchpad.tsx) can say something actionable instead of
 // tldraw's bare `migration-error`. See docs/moi-scratchpad.md § Version skew.
 
 // A serialized tldraw schema's migration sequences: sequence id → version, e.g.

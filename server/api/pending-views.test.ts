@@ -10,17 +10,17 @@ import { DATA_DIR } from '../data-dir'
 import { setEventServer } from '../events'
 import { codexHarness } from '../harness/codex'
 import type { SendMessageInput } from '../harness/types'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import {
   DEFAULT_SELECTED_SESSION_PATH,
   getSelectedSession,
   saveSelectedSession,
   setSelectedSessionPath
-} from '../selected-session'
+} from '../sessions/selected'
 import { viewTabId } from '@/lib/workspace-tabs'
 import { addUpload } from '../uploads'
-import { setPendingViewStorePath } from '../pending-views'
-import { DEFAULT_SESSION_STORE_PATH, setSessionStorePath } from '../session-store'
+import { setPendingViewStorePath } from '../sessions/pending-views'
+import { DEFAULT_SESSION_STORE_PATH, setSessionStorePath } from '../sessions/store'
 
 let tempDir: string
 let events: { type: string; workspaceId?: string; sessionId?: string | null }[]

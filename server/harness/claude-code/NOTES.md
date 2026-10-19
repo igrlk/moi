@@ -19,7 +19,9 @@ Evidence drawn from:
 - Upstream nested content types: `node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.d.ts`
 - SDK bundled source: `sdk.mjs` (for undocumented behavior around `isSynthetic` / `isReplay`)
 - Official docs: <https://code.claude.com/docs/en/agent-sdk/typescript>
-- Repo code: `server/agent.ts`, `server/state.ts`, `lib/types.ts`, `client/components/MessageBlock.tsx`
+- Historical repo code at capture time: `server/agent.ts`, `server/state.ts`,
+  `lib/types.ts`, `client/components/MessageBlock.tsx`. These are research-era
+  locations; current module ownership is described in the status note above.
 - Captured live: `workspace/raw-sdk-messages.jsonl` (skill load + sub-agent run)
 
 ---

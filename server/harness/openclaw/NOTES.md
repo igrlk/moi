@@ -85,8 +85,7 @@ Three auth concepts stack on the gateway:
 
 A loopback `gateway-client` in `backend` mode holding a valid gateway token
 skips pairing entirely — this is Moi's path, and on a fresh install it gets
-full operator scopes immediately (verified in the cloud sandbox,
-`docs/openclaw-sandbox.md`). The pairing dance below bites shared/remote
+full operator scopes immediately (observed in the original cloud-sandbox run). The pairing dance below bites shared/remote
 setups where devices start with **`operator.read` only**. When the CLI
 connects with insufficient scopes the gateway emits:
 
@@ -716,8 +715,8 @@ subpath import wins over rolling a minimal client.
   upstream `strip-inbound-meta` (re-diff on every bump, see its header).
 - `wire-replay.test.ts` — the frame orders a live gateway produces, replayed
   through the real session code. **Record a run before changing how frames are
-  interpreted** (`docs/openclaw-sandbox.md` shows how), then transcribe what it
-  shows into a scenario there. Every ordering and duplication bug this harness
+  interpreted**. The gateway taps frames through `../debug.ts`; inspect them
+  in `/dev/harness`, then transcribe the observed order into a scenario there. Every ordering and duplication bug this harness
   has shipped came from reasoning about frame order in the abstract; a
   recording is the only thing that argues back.
 
@@ -746,4 +745,5 @@ openclaw dashboard                      # open Control UI with token in URL
 
 `openclaw --dev` runs a completely isolated instance under `~/.openclaw-dev/`
 on port `19001`. Same for `--profile <name>` (`~/.openclaw-<name>/`) — the
-multi-version test rig in `docs/openclaw-sandbox.md` is built on profiles.
+original multi-version test rig used profiles. Its sandbox setup guide is no
+longer included; these commands record the versions investigated here.

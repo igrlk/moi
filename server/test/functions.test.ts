@@ -4,13 +4,18 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import { callFunction, callFunctionEphemeral, parseFunctionPath, restartWorker } from '../functions'
+import {
+  callFunction,
+  callFunctionEphemeral,
+  parseFunctionPath,
+  restartWorker
+} from '../applets/functions'
 import {
   resetWorkspaceEnvForTest,
   setSecretStoreBackend,
   setWorkspaceEnvStorePath,
   updateWorkspaceEnv
-} from '../workspace-env'
+} from '../workspaces/env'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
 

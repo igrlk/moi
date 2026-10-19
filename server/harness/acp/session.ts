@@ -23,7 +23,7 @@ import {
   materializeAttachmentPaths,
   prepareAttachmentMessage,
   type PreparedAttachmentMessage
-} from '../../attachment-message'
+} from '../../sessions/attachment-message'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import { type Part, applyEvent, emptyViewState } from '@/lib/format'
 import type { Model, SessionActivity, StreamEvent, ViewState, WorkspaceType } from '@/lib/types'
@@ -52,8 +52,8 @@ import {
 import { harnessStore } from '../auth'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
-import { hasSessionConfig, saveSessionConfig } from '../../session-config'
-import { renameSessionReferences } from '../../session-lifecycle'
+import { hasSessionConfig, saveSessionConfig } from '../../sessions/config'
+import { renameSessionReferences } from '../../sessions/lifecycle'
 
 export type AcpSpawnContext = {
   workspaceId: string

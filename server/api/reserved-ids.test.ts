@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { RESERVED_WORKSPACE_IDS } from '@/lib/ids'
 
 import { api } from './index'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 
 // Literal (non-parameter) first segments registered under `/api/workspaces/` —
 // exactly the paths that would shadow `/:id`.

@@ -67,3 +67,10 @@ Modified clicks, downloads, and explicit link targets retain browser behavior.
 A tab click restores its last address from browser memory; an explicit link opens exactly the
 state it names. Parked views keep their own params. Reload preserves only the active URL.
 Saved layouts store tab paths such as `views/events`, tab order, and the default tab, without query strings.
+
+## Implementation
+
+`server/workspaces/tabs.ts` builds the tab list and validates destinations.
+`server/navigation-relay.ts` waits for browser acknowledgements, with requests
+handled by `server/control.ts`. The CLI entry modules are
+`server/cli/commands/navigate.ts` and `server/cli/commands/tabs.ts`.

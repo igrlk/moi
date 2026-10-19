@@ -15,7 +15,7 @@ test('tldraw is pinned to an exact version', () => {
 })
 
 // The server writes scratchpad snapshots through tldraw's React-free
-// sub-packages (see server/scratchpad-executor.ts), imported directly rather
+// sub-packages (see server/scratchpad/executor.ts), imported directly rather
 // than via `tldraw`. They must be pinned to the very same version as `tldraw`:
 // they're the schema the server writes, and `tldraw` is the schema the browser
 // reads. Bump all four together.

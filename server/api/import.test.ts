@@ -9,7 +9,7 @@ import { api } from './index'
 import { harnessStore } from '../harness/auth'
 import { claudeCodeHarness } from '../harness/claude-code'
 import { codexHarness } from '../harness/codex'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 
 let tempDir: string
 const originalClaudeAvailability = claudeCodeHarness.availability

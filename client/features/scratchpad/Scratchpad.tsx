@@ -49,7 +49,7 @@ const LICENSE_KEY = process.env.PUBLIC_TLDRAW_LICENSE_KEY || undefined
 
 // Execute a relayed op in this tab. Only `view` is relayed now — rasterizing the
 // canvas to a PNG needs the browser (`editor.toImageDataUrl`); every mutation runs
-// server-side against the disk snapshot (see server/scratchpad-executor.ts), so a
+// server-side against the disk snapshot (see server/scratchpad/executor.ts), so a
 // non-view op arriving here is unexpected.
 function makeExecutor(editor: Editor) {
   return async (op: ScratchOp): Promise<ScratchOpResult> => {
@@ -73,7 +73,7 @@ function makeExecutor(editor: Editor) {
 // Instead `upload` POSTs the bytes once and stores a tiny `asset:<file>` src on
 // the record; `resolve` maps it back to the serving URL at render time. Legacy
 // snapshots still holding data URLs pass through `resolve` untouched (the
-// server extracts them to files on the next save). See server/scratchpad-assets.ts.
+// server extracts them to files on the next save). See server/scratchpad/assets.ts.
 function makeAssetStore(workspaceId: string): TLAssetStore {
   const base = `/api/workspaces/${workspaceId}/scratchpad/assets`
   return {

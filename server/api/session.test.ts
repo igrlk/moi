@@ -3,13 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { api } from './index'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import {
   DEFAULT_SESSION_STORE_PATH,
   getSessionRecord,
   patchSessionRecord,
   setSessionStorePath
-} from '../session-store'
+} from '../sessions/store'
 import { harnessFor } from '../harness/registry'
 import type { StreamEvent } from '@/lib/types'
 

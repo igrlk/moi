@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, statSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { installBundledSkills } from '../skills-template'
-import { updateWorkspaceSkills } from '../skill-update'
+import { installBundledSkills } from '../skills/template'
+import { updateWorkspaceSkills } from '../skills/update'
 
 const SKILL_MD = join('moi-workspace', 'SKILL.md')
 const CHEAT_SHEET = join('moi-workspace', 'references', 'UI-COMPONENTS.md')

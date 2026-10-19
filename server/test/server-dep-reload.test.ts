@@ -3,8 +3,8 @@ import { parse, stringify } from 'devalue'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'path'
 
-import { callFunction, killAllWorkers } from '../functions'
-import { handleBundle } from '../widgets'
+import { callFunction, killAllWorkers } from '../applets/functions'
+import { handleBundle } from '../applets/widgets'
 import { silenceConsole } from './quiet'
 
 // Editing a helper that ONLY a `.server.ts` module imports has to reach a live

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useWorkspaceId } from '@/client/features/workspace/WorkspaceContext'
 import type { ToolCall } from '@/lib/types'
 
-// Image extensions the server's preview route can render (see server/preview.ts).
+// Image extensions the server's preview route can render (see server/workspaces/preview.ts).
 const IMAGE_PATH_RE = /\.(png|jpe?g|gif|webp|avif|svg)$/i
 
 // When the agent `Read`s an image that lives inside the workspace, return its

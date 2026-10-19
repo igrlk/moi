@@ -12,7 +12,7 @@ at `/opt/pw-browsers/chromium` is used instead.
 ## Per session
 
 ```sh
-bun server/cli.ts init /tmp/test-ws     # register a scratch workspace
+bun server/cli.ts init /tmp/test-ws --harness=claude-code  # choose the test harness
 bun run dev                             # port 13337 — use run_in_background,
                                         # detached processes get reaped
 ```
@@ -60,5 +60,5 @@ the relay.
 Dev-bundler trap that once broke this flow: Bun snapshots `process.env` at
 server start, so `PUBLIC_*` inlining (bunfig `[serve.static] env`) never sees
 vars set later from server code — a bare `process.env.…` then reaches the
-browser and throws. The CLI launcher (`server/cli.ts`) defaults
+browser and throws. The start command (`server/cli/commands/start.ts`) defaults
 `PUBLIC_TLDRAW_LICENSE_KEY` for this reason.

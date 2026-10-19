@@ -11,7 +11,7 @@ import {
   listViews,
   reconcileOrder,
   serveView
-} from '../views'
+} from '../applets/views'
 import { silenceConsole } from './quiet'
 
 // These tests exercise the view orchestration logic WITHOUT invoking Bun.build:

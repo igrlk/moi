@@ -26,7 +26,7 @@ import { listCodexThreads } from './thread-list'
 import { agentCommand } from '../../agent-launcher'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
-import { resolveWorkspaceEnv } from '../../workspace-env'
+import { resolveWorkspaceEnv } from '../../workspaces/env'
 
 export type CodexProcessInfo = {
   running: boolean

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { WorkspaceTabsState, WorkspaceTheme } from '@/lib/types'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
-import { mergeLayoutForSave } from '@/server/layout'
+import { mergeLayoutForSave } from '@/server/workspaces/layout'
 
 import { accumulateLayoutSave } from './layout-save'
 

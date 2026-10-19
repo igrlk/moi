@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'path'
 
-import { skillsDirFor, validateWorkspaceFolderName } from '../workspace-init'
+import { skillsDirFor, validateWorkspaceFolderName } from '../workspaces/init'
 
 // Pure helpers only — `provisionWorkspace` composes `installBundledSkills` and
 // `scaffoldMoiDir` (covered by their own tests) and would hit the network via

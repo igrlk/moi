@@ -4,7 +4,7 @@
 // Usage: bun scripts/probe-mcp.ts <workspaceId>
 
 import { harnessFor } from '../server/harness/registry'
-import { getWorkspace } from '../server/registry'
+import { getWorkspace } from '../server/workspaces/registry'
 
 const id = process.argv[2] ?? '83f08193-3812-4dd0-ac06-7d2cba88a7c3'
 

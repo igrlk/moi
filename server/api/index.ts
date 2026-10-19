@@ -28,19 +28,24 @@ import { harnessStore } from '../harness/auth'
 import { harnesses } from './harnesses'
 import { clientAppConfig, getAppConfig } from '../app-config'
 import { getAppSettings, pickAppSettingsPatch, saveAppSettings } from '../app-settings'
-import { appletForModule, recordAppletError } from '../applet-log'
+import { appletForModule, recordAppletError } from '../applets/log'
 import { apiBaseFor, parseAppletTail, serveWorkspaceFile } from '../applets'
-import { applyEnvChanged } from '../env-apply'
+import { applyEnvChanged } from '../workspaces/env-apply'
 import { publishEvent } from '../events'
-import { callFunction, parseFunctionPath } from '../functions'
-import { processIcon } from '../icon'
-import { getWorkspacePreview, loadLayout, mergeLayoutForSave, saveLayout } from '../layout'
+import { callFunction, parseFunctionPath } from '../applets/functions'
+import { processIcon } from '../workspaces/icon'
+import {
+  getWorkspacePreview,
+  loadLayout,
+  mergeLayoutForSave,
+  saveLayout
+} from '../workspaces/layout'
 import {
   getAppletThumbnailRecords,
   isValidAppletId,
   saveAppletThumbnails,
   serveAppletThumbnail
-} from '../thumbnails'
+} from '../applets/thumbnails'
 import { getClientFrameLog, getWireLog } from '../harness/debug'
 import { loginShellPath } from '../harness/shell-path'
 import { allHarnesses, harnessFor, isHarnessType } from '../harness/registry'
@@ -51,26 +56,26 @@ import {
   registerWorkspace,
   removeWorkspace,
   reorderWorkspaces
-} from '../registry'
-import { loadScratchpadDoc, saveScratchpadDoc } from '../scratchpad'
-import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from '../scratchpad-assets'
+} from '../workspaces/registry'
+import { loadScratchpadDoc, saveScratchpadDoc } from '../scratchpad/document'
+import { MAX_ASSET_BYTES, scratchpadAssetFile, storeScratchpadAsset } from '../scratchpad/assets'
 import {
   getPinnedSession,
   getSelectedSession,
   getWorkspaceSessionSelection,
   pinSession,
   saveSelectedSession
-} from '../selected-session'
-import type { SelectedSessionUpdate } from '../selected-session'
-import { saveSessionConfig } from '../session-config'
-import type { SessionConfigPatch } from '../session-config'
-import { getSessionRecord, withSessionRecords } from '../session-store'
-import { archiveWorkspaceSession } from '../session-archive'
+} from '../sessions/selected'
+import type { SelectedSessionUpdate } from '../sessions/selected'
+import { saveSessionConfig } from '../sessions/config'
+import type { SessionConfigPatch } from '../sessions/config'
+import { getSessionRecord, withSessionRecords } from '../sessions/store'
+import { archiveWorkspaceSession } from '../sessions/archive'
 import { DIST_DIR, prebuilt } from '../static'
-import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from '../skill-update'
-import { serveWorkspaceImagePreview } from '../preview'
+import { getWorkspaceSkillsStatus, updateWorkspaceSkills } from '../skills/update'
+import { serveWorkspaceImagePreview } from '../workspaces/preview'
 import { MAX_UPLOAD_BYTES, addUpload, addWorkspaceFileUpload, getUpload } from '../uploads'
-import { requiredEnvFor } from '../required-env'
+import { requiredEnvFor } from '../workspaces/required-env'
 import {
   deleteView,
   listCompiledViews,
@@ -78,25 +83,25 @@ import {
   serveView,
   updateViewTitle,
   ViewMutationError
-} from '../views'
+} from '../applets/views'
 import {
   createPendingView,
   discardPendingView,
   getPendingView,
   updatePendingView,
   PendingViewError
-} from '../pending-views'
-import { submitView, ViewStartupError } from '../view-sessions'
-import { listWidgets, serveWidget } from '../widgets'
-import { getWorkspaceConfig, setWorkspaceConfig } from '../workspace-config'
+} from '../sessions/pending-views'
+import { submitView, ViewStartupError } from '../sessions/view-sessions'
+import { listWidgets, serveWidget } from '../applets/widgets'
+import { getWorkspaceConfig, setWorkspaceConfig } from '../workspaces/config'
 import {
   createdWorkspacesRoot,
   provisionWorkspace,
   validateWorkspaceFolderName
-} from '../workspace-init'
-import { resolveWorkspaceImportMetadata } from '../workspace-import'
-import type { WorkspaceImportMetadata } from '../workspace-import'
-import { getWorkspaceEnvView, parseEnvUpdate, updateWorkspaceEnv } from '../workspace-env'
+} from '../workspaces/init'
+import { resolveWorkspaceImportMetadata } from '../workspaces/import'
+import type { WorkspaceImportMetadata } from '../workspaces/import'
+import { getWorkspaceEnvView, parseEnvUpdate, updateWorkspaceEnv } from '../workspaces/env'
 import {
   getCachedUpdateStatus,
   hasRunningAgentSessions,
@@ -354,7 +359,7 @@ one.post('/rpc/*', c => {
 // `moi debug logs` reads it back (docs/self-correction.md). Unauthenticated
 // localhost route, so treat the payload as hostile: whitelist the browser-only
 // sources (`build`/`rpc` are server-recorded and can't be spoofed by a tab),
-// pattern-check the applet name, cap the batch size; applet-log.ts caps string
+// pattern-check the applet name, cap the batch size; applets/log.ts caps string
 // lengths.
 one.post('/applet-log', async c => {
   let body: { events?: unknown }
@@ -398,7 +403,7 @@ one.post('/applet-log', async c => {
 
 // Downscaled image preview of a workspace file. The chat's expanded tool rows
 // use this to show the picture an agent `Read` — same guards as /files/ above,
-// images only, resized server-side (see server/preview.ts).
+// images only, resized server-side (see server/workspaces/preview.ts).
 one.get('/preview/*', c => {
   const ws = c.get('ws')
   const tail = new URL(c.req.url).pathname.split(`/api/workspaces/${ws.id}/preview/`)[1] ?? ''
@@ -738,7 +743,7 @@ one.put('/config', async c => {
 // snapshot ({ document, origin }) and broadcasts so other open tabs reload.
 // `origin` is the writing tab's id — echoed in the broadcast so that tab can
 // ignore its own save. This is the browser's write path; the agent's draws are
-// written server-side (see scratchpad-executor.ts). See docs/moi-scratchpad.md.
+// written server-side (see server/scratchpad/executor.ts). See docs/moi-scratchpad.md.
 one.get('/scratchpad', async c => {
   return c.json(await loadScratchpadDoc(c.get('ws').path))
 })
@@ -760,7 +765,7 @@ one.put('/scratchpad', async c => {
 
 // Scratchpad assets: pasted/dropped image bytes live as content-addressed files
 // in `.moi/.scratchpad/`, referenced from the snapshot by `asset:` srcs —
-// never inlined as base64 in the JSON (see server/scratchpad-assets.ts). The
+// never inlined as base64 in the JSON (see server/scratchpad/assets.ts). The
 // browser's TLAssetStore POSTs the raw file here on paste and resolves `asset:`
 // srcs back through the GET when rendering.
 one.post('/scratchpad/assets', async c => {

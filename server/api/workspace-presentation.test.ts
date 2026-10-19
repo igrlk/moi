@@ -7,8 +7,8 @@ import type { WorkspaceEntry } from '@/lib/types'
 
 import { api } from './index'
 import { setEventServer } from '../events'
-import { loadLayout } from '../layout'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { loadLayout } from '../workspaces/layout'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',

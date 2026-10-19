@@ -13,7 +13,7 @@ import type { InitializeResponse, RequestPermissionRequest } from './wire'
 import { agentCommand } from '../../agent-launcher'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
-import { resolveWorkspaceEnv } from '../../workspace-env'
+import { resolveWorkspaceEnv } from '../../workspaces/env'
 
 const REQUEST_TIMEOUT_MS = 120_000
 

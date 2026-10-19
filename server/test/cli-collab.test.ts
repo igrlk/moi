@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const CLI = join(import.meta.dir, '..', 'cli.ts')
+const PACKAGE_ROOT = join(import.meta.dir, '..', '..')
 let directory: string
 let workspace: string
 let capturePath: string
@@ -23,7 +24,7 @@ beforeEach(async () => {
   await Bun.write(
     join(bin, 'bun'),
     '#!/bin/sh\n' +
-      `printf '{"command":"%s","flag":"%s","dev":"%s","server":"%s"}\\n' "$2" "$3" "$MOI_DEV" "$MOI_SERVER" > "$COLLAB_CAPTURE_PATH"\n`
+      `printf '{"entry":"%s","cwd":"%s","command":"%s","flag":"%s","dev":"%s","server":"%s"}\\n' "$1" "$PWD" "$2" "$3" "$MOI_DEV" "$MOI_SERVER" > "$COLLAB_CAPTURE_PATH"\n`
   )
   await chmod(join(bin, 'bun'), 0o755)
   env = {
@@ -74,6 +75,8 @@ async function runCli(args: string[]) {
 }
 
 async function capturedServerLaunch(): Promise<{
+  entry: string
+  cwd: string
   command: string
   flag: string
   dev: string
@@ -101,12 +104,17 @@ describe('collab runtime CLI flag', () => {
       ]
       test(`${args.join(' ')} forwards only the requested runtime flag`, async () => {
         const child = spawnCli(args)
-        expect(await capturedServerLaunch()).toEqual({
+        const launch = await capturedServerLaunch()
+        expect(launch).toMatchObject({
+          entry: CLI,
           command: 'start',
           flag: enabled ? '--experimental-collab' : '',
           dev: dev ? '1' : '',
           server: '1'
         })
+        // The dev supervisor must watch the package root, even when the CLI
+        // was invoked from another workspace and its commands live deeper.
+        if (dev) expect(launch.cwd).toBe(PACKAGE_ROOT)
         if (dev) {
           expect(child.exitCode).toBeNull()
           child.kill('SIGTERM')

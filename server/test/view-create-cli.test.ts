@@ -17,8 +17,8 @@ async function runCreate(
     import { mock, spyOn } from 'bun:test'
     const constants = await import(${JSON.stringify(join(SERVER, 'constants.ts'))})
     mock.module(${JSON.stringify(join(SERVER, 'constants.ts'))}, () => ({ ...constants, CONTROL_PORT: 0 }))
-    const registry = await import(${JSON.stringify(join(SERVER, 'registry.ts'))})
-    const sessions = await import(${JSON.stringify(join(SERVER, 'view-sessions.ts'))})
+    const registry = await import(${JSON.stringify(join(SERVER, 'workspaces', 'registry.ts'))})
+    const sessions = await import(${JSON.stringify(join(SERVER, 'sessions', 'view-sessions.ts'))})
     const { navigationRelay } = await import(${JSON.stringify(join(SERVER, 'navigation-relay.ts'))})
     const calls = []
     spyOn(registry, 'listWorkspaces').mockResolvedValue([{ id: 'workspace', path: ${JSON.stringify(WORKSPACE)} }])

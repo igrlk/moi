@@ -3,7 +3,7 @@ import { parse, stringify } from 'devalue'
 import { join } from 'path'
 
 const FIXTURES = join(import.meta.dir, '__fixtures__')
-const WORKER_PATH = join(import.meta.dir, '..', 'functions-worker.ts')
+const WORKER_PATH = join(import.meta.dir, '..', 'applets', 'functions-worker.ts')
 
 type ResultMsg = { id: string; type: 'result'; data: string }
 type ErrorMsg = { id: string; type: 'error'; message: string }

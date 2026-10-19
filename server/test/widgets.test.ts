@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import type { WidgetInfo } from '@/lib/types'
 
-import { listWidgets } from '../widgets'
+import { listWidgets } from '../applets/widgets'
 
 let workspacePath: string
 

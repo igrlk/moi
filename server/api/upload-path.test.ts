@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, symlink, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { api } from './index'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import { getUpload, MAX_UPLOAD_BYTES } from '../uploads'
 import type { UploadInfo } from '@/lib/types'
 

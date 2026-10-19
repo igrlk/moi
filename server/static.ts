@@ -7,7 +7,7 @@ import { join } from 'node:path'
 // install tree. In dev there is no `dist/`, so web.ts falls back to the
 // imported HTML route + Bun.serve's live bundler (HMR). `import.meta.dir` is
 // server/, so `dist/` sits one level up. The Hono API serves files from here
-// via `serveStatic` (see api.ts).
+// via `serveStatic` (see api/index.ts).
 export const DIST_DIR = join(import.meta.dir, '..', 'dist')
 const DIST_INDEX = join(DIST_DIR, 'index.html')
 

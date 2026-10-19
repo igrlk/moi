@@ -29,10 +29,10 @@ import {
   killAllCCSessions,
   sendCCMessage
 } from '../harness/claude-code/session'
-import { getWorkspace, registerWorkspace, setRegistryPath } from '../registry'
+import { getWorkspace, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import { addClient, removeClient } from '../state'
-import { setSessionStorePath } from '../session-store'
-import { setSelectedSessionPath } from '../selected-session'
+import { setSessionStorePath } from '../sessions/store'
+import { setSelectedSessionPath } from '../sessions/selected'
 
 // ---------------------------------------------------------------------------
 // Setup: isolated registry + a throwaway Claude Code workspace.

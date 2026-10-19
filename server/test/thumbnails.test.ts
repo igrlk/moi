@@ -9,7 +9,7 @@ import {
   pruneAppletThumbnails,
   saveAppletThumbnails,
   serveAppletThumbnail
-} from '../thumbnails'
+} from '../applets/thumbnails'
 
 let dir: string
 

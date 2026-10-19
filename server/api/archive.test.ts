@@ -13,13 +13,13 @@ import {
   setArchivedSessionsPath
 } from '../harness/acp/archived'
 import { openclawHarness } from '../harness/openclaw'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 import {
   DEFAULT_SELECTED_SESSION_PATH,
   getSelectedSession,
   saveSelectedSession,
   setSelectedSessionPath
-} from '../selected-session'
+} from '../sessions/selected'
 import { silenceConsole } from '../test/quiet'
 
 // One test makes `archiveSession` throw; the route logs that error on purpose.

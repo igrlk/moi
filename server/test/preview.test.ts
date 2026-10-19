@@ -7,7 +7,7 @@ import sharp from 'sharp'
 import { readImageRelPath } from '@/client/features/chat/messages/tool-group/ReadImagePreview'
 import type { ToolCall } from '@/lib/types'
 
-import { serveWorkspaceImagePreview } from '../preview'
+import { serveWorkspaceImagePreview } from '../workspaces/preview'
 
 async function makeWorkspace() {
   const root = mkdtempSync(join(tmpdir(), 'moi-preview-'))

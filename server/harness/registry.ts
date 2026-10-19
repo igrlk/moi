@@ -1,5 +1,5 @@
 // WorkspaceType → Harness lookup. This is the single import surface for the
-// rest of the server: web.ts/api.ts/etc. dispatch through harnessFor()
+// rest of the server: web.ts/api/index.ts/etc. dispatch through harnessFor()
 // instead of branching on workspace.type (documented exceptions: cli.ts
 // provisioning and tests import harness internals directly).
 import type { WorkspaceEntry, WorkspaceType } from '@/lib/types'

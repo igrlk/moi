@@ -23,7 +23,7 @@ npm dependencies in `.moi/`. Rebuilding remains a separate `moi bundle` step.
 
 ## Registry
 
-`registry.json` is the source of truth. `server/ui-components.ts` uses the
+`registry.json` is the source of truth. `server/applets/ui-components.ts` uses the
 pinned shadcn registry loader to read it, then recursively collects local
 dependencies and deduplicates files and npm packages. The CLI accepts only
 names from the bundled catalog, so installs work offline.

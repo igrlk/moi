@@ -10,7 +10,7 @@ import {
   getWorkspace,
   registerWorkspace,
   setRegistryPath
-} from '../registry'
+} from '../workspaces/registry'
 
 const originalStopWorkspace = codexHarness.stopWorkspace
 let tempDir: string

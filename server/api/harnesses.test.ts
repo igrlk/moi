@@ -12,7 +12,7 @@ import {
   listWorkspaces,
   registerWorkspace,
   setRegistryPath
-} from '../registry'
+} from '../workspaces/registry'
 
 const original = {
   startLogin: codexHarness.startLogin,

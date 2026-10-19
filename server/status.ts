@@ -8,9 +8,9 @@
 import { getAppConfig } from './app-config'
 import { CONTROL_PORT, PORT } from './constants'
 import { debugEnabled } from './debug'
-import { WORKER_LIMITS, type WorkerDebugInfo, getWorkersDebugSnapshot } from './functions'
+import { WORKER_LIMITS, type WorkerDebugInfo, getWorkersDebugSnapshot } from './applets/functions'
 import { allHarnesses } from './harness/registry'
-import { tildify } from './registry'
+import { tildify } from './workspaces/registry'
 import { getClientCount } from './state'
 import { VERSION } from './version'
 

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { resolvePackageTypeRoot, typecheckApplets } from '../applet-typecheck'
+import { resolvePackageTypeRoot, typecheckApplets } from '../applets/typecheck'
 import { COLLAB_DECLARATION_SOURCE_PATH } from '../applets/declarations'
 
 let workspaceRoot = ''

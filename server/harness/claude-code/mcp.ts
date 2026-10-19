@@ -6,7 +6,7 @@ import { debugEnabled } from '../../debug'
 import { requireHarnessExecutable } from '../executable'
 
 // MCP server status probing. Intentionally decoupled from agent chat runs
-// (cc-session.ts): connecting to MCP servers and reading their status is a
+// (session.ts): connecting to MCP servers and reading their status is a
 // metadata concern, not part of any conversation. Nothing here submits a user
 // turn, so probing costs zero model tokens.
 //

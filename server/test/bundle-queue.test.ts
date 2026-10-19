@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { serializeWorkspaceBundle } from '../bundle-queue'
+import { serializeWorkspaceBundle } from '../applets/bundle-queue'
 
 describe('workspace bundle queue', () => {
   test('serializes bundles for one workspace', async () => {

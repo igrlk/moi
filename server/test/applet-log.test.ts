@@ -7,7 +7,7 @@ import {
   getAppletLogCount,
   recordAppletError,
   syncAppletLogAfterBuild
-} from '../applet-log'
+} from '../applets/log'
 
 // The journal is keyed by workspace path, so each test isolates itself with a
 // unique fake path — no shared state between tests.

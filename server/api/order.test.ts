@@ -7,7 +7,7 @@ import type { WorkspaceEntry } from '@/lib/types'
 
 import { api } from './index'
 import { setEventServer } from '../events'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
 
 let tempDir: string
 let published: string[]

@@ -8,7 +8,7 @@ import { openBrowser } from '../../open-browser'
 import type { HarnessAvailability } from '@/lib/types'
 
 import { agentCommand } from '../../agent-launcher'
-import { resolveWorkspaceEnv } from '../../workspace-env'
+import { resolveWorkspaceEnv } from '../../workspaces/env'
 import { findHarnessExecutable } from '../executable'
 
 function signedOut(reason: string): HarnessAvailability {

@@ -9,14 +9,14 @@ import {
   BASE_DECLARATION_SOURCE_PATH,
   COLLAB_DECLARATION_SOURCE_PATH
 } from '../applets/declarations'
-import { readSkillVersion } from '../skill-version'
+import { readSkillVersion } from '../skills/version'
 import {
   getWorkspaceSkillsStatus,
   summarizeSkillStatuses,
   updateWorkspaceSkills
-} from '../skill-update'
-import { BUNDLED_SKILLS_DIR, installBundledSkills } from '../skills-template'
-import { skillsDirFor } from '../workspace-init'
+} from '../skills/update'
+import { BUNDLED_SKILLS_DIR, installBundledSkills } from '../skills/template'
+import { skillsDirFor } from '../workspaces/init'
 
 let tempRoot = ''
 

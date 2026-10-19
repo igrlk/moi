@@ -1,0 +1,335 @@
+import { existsSync } from 'node:fs'
+
+import { viewTabId } from '@/lib/workspace-tabs'
+import type { CompiledView, ViewConfig, ViewInfo, WorkspaceEntry } from '@/lib/types'
+
+import { syncAppletLogAfterBuild } from './log'
+import {
+  buildApplets,
+  getAppletPaths,
+  getAppletRevision,
+  listBuilt,
+  scanSources,
+  serveApplet
+} from './'
+import { serializeWorkspaceBundle } from './bundle-queue'
+import { reloadModules } from './functions'
+import { loadLayout, saveLayout } from '../workspaces/layout'
+import { completeViewBuild, listPendingViews } from '../sessions/pending-views'
+import { archiveViewSessions } from '../sessions/archive'
+import { setViewSourceTitle } from './config'
+import { deleteViewSourceFiles, readViewSource, ViewSourceInUseError } from './view-source'
+
+// The view applet kind. Sources in `.moi/views/`, compiled output + manifest in
+// `.moi/.build/views/`; the shared mechanics live in `applets/index.ts`. Manifest
+// shape: `{ config: { <name>: ViewConfig }, order: [<name>, …] }`. `order` is the nav
+// tab order — first-seen (creation) order, persisted so it's stable across
+// rebuilds (the filesystem can't recover creation order).
+type ViewManifest = {
+  config: Record<string, ViewConfig>
+  order: string[]
+}
+
+export class ViewMutationError extends Error {
+  constructor(
+    message: string,
+    public status: 404 | 409 | 422
+  ) {
+    super(message)
+    this.name = 'ViewMutationError'
+  }
+}
+
+async function readManifest(workspacePath: string): Promise<ViewManifest> {
+  const { manifestPath } = getAppletPaths(workspacePath, 'view')
+  try {
+    const data = JSON.parse(await Bun.file(manifestPath).text())
+    return { config: data.config ?? {}, order: Array.isArray(data.order) ? data.order : [] }
+  } catch {
+    return { config: {}, order: [] }
+  }
+}
+
+async function writeManifest(workspacePath: string, manifest: ViewManifest): Promise<void> {
+  const { manifestPath } = getAppletPaths(workspacePath, 'view')
+  await Bun.write(manifestPath, JSON.stringify(manifest, null, 2))
+}
+
+// Keep existing order, drop deleted names, append newly-seen names in scan
+// order — so a view holds its tab position once it first appears. Exported for
+// testing.
+export function reconcileOrder(prevOrder: string[], names: string[]): string[] {
+  const present = new Set(names)
+  const kept = prevOrder.filter(n => present.has(n))
+  const keptSet = new Set(kept)
+  const appended = names.filter(n => !keptSet.has(n))
+  return [...kept, ...appended]
+}
+
+export type ViewBuildResult = {
+  name: string
+  status: 'built' | 'skipped' | 'failed'
+  error?: string
+  serverModules?: string[]
+  config?: ViewConfig | null
+}
+
+export async function buildAllViews(
+  workspacePath: string,
+  force = false,
+  target?: string
+): Promise<ViewBuildResult[]> {
+  const { names, results, ms } = await buildApplets<ViewConfig>(
+    workspacePath,
+    'view',
+    force,
+    target
+  )
+
+  const manifest = await readManifest(workspacePath)
+  for (const r of results) {
+    if (r.status === 'built') manifest.config[r.name] = r.config ?? {}
+  }
+  for (const key of Object.keys(manifest.config)) {
+    if (!names.includes(key)) delete manifest.config[key]
+  }
+  manifest.order = reconcileOrder(manifest.order, names)
+  // Persist only when there's a build dir to hold the manifest — see the note in
+  // `widgets.ts`. Keeps an applet-less workspace a no-op on disk.
+  const { buildDir } = getAppletPaths(workspacePath, 'view')
+  if (existsSync(buildDir)) await writeManifest(workspacePath, manifest)
+
+  const builtCount = results.filter(r => r.status === 'built').length
+  const failed = results.filter(r => r.status === 'failed')
+  console.log(
+    `[bundle] ${builtCount}/${names.length} views built in ${ms}ms` +
+      (failed.length ? `, ${failed.length} failed` : '') +
+      (force ? ' (forced)' : '')
+  )
+  for (const r of failed) {
+    console.error(`[bundle] ${r.name}:\n${r.error}`)
+  }
+
+  return results
+}
+
+function listBuiltViews(workspacePath: string): Promise<string[]> {
+  const { buildDir } = getAppletPaths(workspacePath, 'view')
+  return listBuilt(buildDir)
+}
+
+// Built views in manifest order, with `title` resolved (falls back to the id).
+export async function listCompiledViews(workspacePath: string): Promise<CompiledView[]> {
+  const [built, manifest] = await Promise.all([
+    listBuiltViews(workspacePath),
+    readManifest(workspacePath)
+  ])
+  const builtSet = new Set(built)
+  // Manifest order first (filtered to what's actually built), then any built
+  // view missing from order (shouldn't happen, but never drop a real bundle).
+  const ordered = [
+    ...manifest.order.filter(id => builtSet.has(id)),
+    ...built.filter(id => !manifest.order.includes(id))
+  ]
+  return ordered.map(id => {
+    const raw = manifest.config[id] ?? {}
+    const icon = typeof raw.icon === 'string' && raw.icon ? raw.icon : undefined
+    const requiredEnv = Array.isArray(raw.requiredEnv) ? raw.requiredEnv : undefined
+    const revision = getAppletRevision(workspacePath, 'view', id)
+    return {
+      id,
+      status: 'compiled',
+      ...(revision ? { revision } : {}),
+      title: raw.title || id,
+      ...(icon ? { icon } : {}),
+      ...(requiredEnv ? { requiredEnv } : {})
+    }
+  })
+}
+
+export async function hasViewId(workspacePath: string, viewId: string): Promise<boolean> {
+  const { sourceDir } = getAppletPaths(workspacePath, 'view')
+  const [sources, built] = await Promise.all([
+    scanSources(sourceDir),
+    listBuiltViews(workspacePath)
+  ])
+  return sources.includes(viewId) || built.includes(viewId)
+}
+
+// Env keys declared via view `config.requiredEnv`, keyed to the view ids that
+// asked. Merged with the widget map in the env API's "required" view.
+export async function collectViewRequiredEnv(
+  workspacePath: string
+): Promise<Record<string, string[]>> {
+  const { config } = await readManifest(workspacePath)
+  const out: Record<string, string[]> = {}
+  for (const [id, cfg] of Object.entries(config)) {
+    if (!Array.isArray(cfg.requiredEnv)) continue
+    for (const key of cfg.requiredEnv) {
+      ;(out[key] ??= []).push(id)
+    }
+  }
+  return out
+}
+
+export async function getWorkspaceViews(workspacePath: string): Promise<ViewInfo[]> {
+  const compiled = await listCompiledViews(workspacePath)
+  const ids = new Set(compiled.map(view => view.id))
+  const pending = (await listPendingViews(workspacePath)).filter(view => !ids.has(view.id))
+  return [...compiled, ...pending]
+}
+
+export async function listViews(workspacePath: string): Promise<Response> {
+  return Response.json({ views: await getWorkspaceViews(workspacePath) })
+}
+
+export async function handleBundleViews(
+  publish: (msg: unknown) => void,
+  workspaceId: string,
+  workspacePath: string,
+  force = false,
+  target?: string
+) {
+  const before = await readManifest(workspacePath)
+  const beforeBuilt = new Set(await listBuiltViews(workspacePath))
+  const results = await buildAllViews(workspacePath, force, target)
+  const after = await readManifest(workspacePath)
+  const afterBuilt = new Set(await listBuiltViews(workspacePath))
+
+  // Keep the applet error journal honest: record build failures, clear entries
+  // superseded by a successful rebuild (see docs/self-correction.md).
+  syncAppletLogAfterBuild(workspacePath, 'view', results)
+
+  const identityChanged = results.some(
+    r =>
+      r.status === 'built' &&
+      ((before.config[r.name]?.title ?? '') !== (r.config?.title ?? '') ||
+        (before.config[r.name]?.icon ?? '') !== (r.config?.icon ?? ''))
+  )
+  const orderChanged = before.order.join('\0') !== after.order.join('\0')
+  const membershipChanged =
+    beforeBuilt.size !== afterBuilt.size ||
+    [...beforeBuilt].some(n => !afterBuilt.has(n)) ||
+    [...afterBuilt].some(n => !beforeBuilt.has(n))
+
+  const changedServerModules = new Set<string>()
+  for (const r of results) {
+    if (r.status === 'built') {
+      publish({ type: 'view:updated', name: r.name, config: r.config ?? null })
+      await completeViewBuild(workspaceId, workspacePath, r.name)
+      for (const m of r.serverModules ?? []) changedServerModules.add(m)
+    }
+  }
+
+  if (changedServerModules.size > 0) {
+    reloadModules([...changedServerModules], workspacePath)
+  }
+
+  const views = await listCompiledViews(workspacePath)
+  if (identityChanged || orderChanged || membershipChanged) {
+    publish({ type: 'view-layout:updated', views })
+  }
+
+  return results
+}
+
+export async function updateViewTitle(
+  publish: (msg: unknown) => void,
+  workspaceId: string,
+  workspacePath: string,
+  viewId: string,
+  title: string
+): Promise<CompiledView> {
+  return serializeWorkspaceBundle(workspacePath, async () => {
+    const current = (await listCompiledViews(workspacePath)).find(view => view.id === viewId)
+    if (!current) throw new ViewMutationError('View not found', 404)
+    if (current.title === title) return current
+
+    const source = await readViewSource(workspacePath, viewId)
+    if (!source) throw new ViewMutationError('View source not found', 409)
+
+    let updated: string
+    try {
+      updated = setViewSourceTitle(source.source, title)
+    } catch (error) {
+      throw new ViewMutationError(
+        error instanceof Error ? error.message : 'Could not update the view title',
+        409
+      )
+    }
+    if (updated === source.source) return current
+
+    await Bun.write(source.path, updated)
+    try {
+      // A rename changed this entry; rebuild only it and leave pending views alone.
+      const results = await handleBundleViews(publish, workspaceId, workspacePath, true, viewId)
+      const result = results.find(candidate => candidate.name === viewId)
+      if (result?.status !== 'built') {
+        throw new ViewMutationError(result?.error ?? 'Could not rebuild the renamed view', 422)
+      }
+
+      const renamed = (await listCompiledViews(workspacePath)).find(view => view.id === viewId)
+      if (!renamed) {
+        throw new ViewMutationError('Renamed view was not found after rebuilding', 422)
+      }
+      return renamed
+    } catch (error) {
+      // An agent may have edited or removed the source while the build ran.
+      if (
+        (await Bun.file(source.path)
+          .text()
+          .catch(() => null)) === updated
+      ) {
+        await Bun.write(source.path, source.source)
+      }
+      throw error
+    }
+  })
+}
+
+export async function deleteView(
+  publish: (msg: unknown) => void,
+  ws: WorkspaceEntry,
+  viewId: string
+): Promise<void> {
+  const { id: workspaceId, path: workspacePath } = ws
+  await serializeWorkspaceBundle(workspacePath, async () => {
+    const current = (await listCompiledViews(workspacePath)).some(view => view.id === viewId)
+    if (!current) throw new ViewMutationError('View not found', 404)
+
+    try {
+      await deleteViewSourceFiles(workspacePath, viewId, () => archiveViewSessions(ws, viewId))
+    } catch (error) {
+      if (error instanceof ViewSourceInUseError) throw new ViewMutationError(error.message, 409)
+      throw error
+    }
+    reloadModules([`views/${viewId}`], workspacePath)
+    await completeViewBuild(workspaceId, workspacePath, viewId)
+    const layout = await loadLayout(workspacePath)
+    const tab = viewTabId(viewId)
+    await saveLayout(
+      {
+        ...layout,
+        tabs: {
+          open: layout.tabs.open.filter(candidate => candidate !== tab),
+          active: layout.tabs.active === tab ? 'overview' : layout.tabs.active
+        }
+      },
+      workspacePath
+    )
+
+    publish({ type: 'view:deleted', workspaceId, name: viewId })
+    publish({ type: 'workspace:updated' })
+    await handleBundleViews(publish, workspaceId, workspacePath, false, viewId)
+  })
+}
+
+export function serveView(
+  name: string,
+  file: string,
+  workspacePath: string,
+  apiBase: string,
+  ifNoneMatch?: string | null
+): Promise<Response> {
+  return serveApplet('view', name, file, workspacePath, apiBase, ifNoneMatch)
+}

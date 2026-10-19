@@ -4,8 +4,8 @@ import { dirname, join } from 'node:path'
 import type { WorkspaceType } from '@/lib/types'
 
 import { appletDeclarationPath, installCollabDeclaration } from '../../applets/declarations'
-import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills-template'
-import { skillsDirFor } from '../../workspace-init'
+import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills/template'
+import { skillsDirFor } from '../../workspaces/init'
 
 export type SkillPaths = { referencePath: string; typesPath: string }
 

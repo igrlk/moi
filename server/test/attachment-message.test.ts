@@ -8,7 +8,7 @@ import {
   AttachmentUploadError,
   materializeAttachmentPaths,
   prepareAttachmentMessage
-} from '../attachment-message'
+} from '../sessions/attachment-message'
 import { addUpload, resolveUploads } from '../uploads'
 import { buildUserMessage } from '../harness/claude-code/session'
 import { ClaudeAdapter } from '../harness/claude-code/adapter'

@@ -6,7 +6,7 @@ import { codexItemToTurn } from '../harness/codex/adapter'
 import { messageToTurn } from '../harness/openclaw/adapter'
 import { replayedUserParts } from '../harness/acp/adapter'
 import { buildUserMessage } from '../harness/claude-code/session'
-import { prepareAttachmentMessage } from '../attachment-message'
+import { prepareAttachmentMessage } from '../sessions/attachment-message'
 
 const attachments = [
   { source: 'view:orders', label: 'Order #1042', text: 'Order ID: 1042' },

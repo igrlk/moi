@@ -6,10 +6,10 @@ import { join } from 'node:path'
 import type { WorkspaceSkillsStatus } from '@/lib/types'
 
 import { api } from './index'
-import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../registry'
-import { readSkillVersion } from '../skill-version'
-import { BUNDLED_SKILLS_DIR } from '../skills-template'
-import { skillsDirFor } from '../workspace-init'
+import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
+import { readSkillVersion } from '../skills/version'
+import { BUNDLED_SKILLS_DIR } from '../skills/template'
+import { skillsDirFor } from '../workspaces/init'
 
 let tempRoot = ''
 

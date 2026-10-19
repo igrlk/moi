@@ -254,8 +254,8 @@ export type ClientMessage =
       // can change between messages in the same session.
       model?: string
       // Reasoning effort for this turn (one of the model's `supportedEffortLevels`).
-      // Omitted means the SDK default. Unlike model, the SDK has no live setter,
-      // so a change forces the live session to resume (see server/cc-session.ts).
+      // Omitted means the provider default. Harnesses apply changes before the
+      // next send (see server/harness/claude-code/session.ts).
       effort?: string
       // Opt into the selected model's faster processing mode. Omitted inherits
       // the provider configuration; false explicitly disables a stored default.
@@ -662,7 +662,7 @@ export type WorkspaceLayout = {
 }
 
 // One applet's thumbnail freshness record. Image bytes live as files in the
-// workspace's `.moi/.cache/thumbnails/` (server/thumbnails.ts), never in
+// workspace's `.moi/.cache/thumbnails/` (server/applets/thumbnails.ts), never in
 // `.workspace.json` — the layout file stays small and commit-safe.
 export type AppletThumbnail = {
   kind: AppletKind

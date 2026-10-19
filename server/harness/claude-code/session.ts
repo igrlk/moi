@@ -6,7 +6,10 @@
 //
 // The SDK persists history to disk. After eviction or a server restart, the
 // next message resumes that history in a new process.
-import { prepareAttachmentMessage, type PreparedAttachmentMessage } from '../../attachment-message'
+import {
+  prepareAttachmentMessage,
+  type PreparedAttachmentMessage
+} from '../../sessions/attachment-message'
 import { attachmentLabel } from '@/lib/moi-attachments'
 import {
   type Options,
@@ -27,10 +30,10 @@ import { moiContextSystemReminder, renderMoiContext } from '@/lib/moi-context'
 import { debug } from '../../debug'
 import { tapWire } from '../debug'
 import { broadcast } from '../../state'
-import { hasSessionConfig, saveSessionConfig } from '../../session-config'
-import { renameSessionReferences } from '../../session-lifecycle'
+import { hasSessionConfig, saveSessionConfig } from '../../sessions/config'
+import { renameSessionReferences } from '../../sessions/lifecycle'
 import { claudeCodeSpawn } from '../../agent-launcher'
-import { resolveWorkspaceEnv } from '../../workspace-env'
+import { resolveWorkspaceEnv } from '../../workspaces/env'
 import { requireHarnessExecutable } from '../executable'
 import type { SendMessageInput } from '../types'
 

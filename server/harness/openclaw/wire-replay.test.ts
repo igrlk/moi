@@ -2,7 +2,7 @@
 // session code.
 //
 // Each scenario below is transcribed from a capture off OpenClaw 2026.7.1
-// (`docs/openclaw-sandbox.md` shows how to record one). Only the fields the
+// (see NOTES.md §11 for the frame taps). Only the fields the
 // harness reads are kept — a capture also carries a fat session row on every
 // frame, timing details, and model prose that no assertion depends on.
 //

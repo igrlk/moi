@@ -3,7 +3,10 @@ import { attachmentLabel } from '@/lib/moi-attachments'
 // Live state per (workspaceId, sessionId): display history, native lifecycle,
 // and previews. client.ts owns the shared workspace process;
 // Codex owns durable history. See NOTES.md for ordering and recovery rules.
-import { prepareAttachmentMessage, type PreparedAttachmentMessage } from '../../attachment-message'
+import {
+  prepareAttachmentMessage,
+  type PreparedAttachmentMessage
+} from '../../sessions/attachment-message'
 import { buildSessionTitleSource } from '../session-title'
 import {
   type MoiContext,
@@ -44,8 +47,8 @@ import { generateCodexSessionTitle, renameCodexSessionIfUnchanged } from './sess
 import { harnessStore } from '../auth'
 import { debug } from '../../debug'
 import { broadcast } from '../../state'
-import { hasSessionConfig, saveSessionConfig } from '../../session-config'
-import { renameSessionReferences } from '../../session-lifecycle'
+import { hasSessionConfig, saveSessionConfig } from '../../sessions/config'
+import { renameSessionReferences } from '../../sessions/lifecycle'
 
 type CodexUserInputItem = { type: 'text'; text: string } | { type: 'image'; url: string }
 

@@ -2,7 +2,7 @@ Agent chat UI powered by Claude Agent SDK, Bun, React, and Tailwind.
 
 ## Structure
 
-- `server/` — Bun server, agent SDK, WebSocket, state persistence
+- `server/` — Bun server, agent backends, WebSocket, state persistence; see [server/README.md](server/README.md) for module ownership and storage paths
 - `client/` — React SPA, components, hooks, styles
 - `lib/` — Shared types between server and client
 
@@ -25,8 +25,8 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 
 ## Data flow
 
-- Each workspace added/imported to Moi stores its settings in a `.moi/.workspace.json` file in the workspace folder (hidden filename; `server/layout.ts` is its sole reader/writer).
-- Everything inside `.moi/` is safe to commit, so the same workspace can be shared with others — except the machine-local dot-dirs: `.build/` (bundler output), `.cache/` (derived artifacts such as applet thumbnails, see `server/thumbnails.ts`), and `.scratchpad/`. All are re-creatable and safe to delete or gitignore.
+- Each workspace added/imported to Moi stores its settings in a `.moi/.workspace.json` file in the workspace folder (hidden filename; `server/workspaces/layout.ts` is its sole reader/writer).
+- Workspace source and shared configuration under `.moi/` can be committed. `.build/` (bundler output) and `.cache/` (derived artifacts such as applet thumbnails, see `server/applets/thumbnails.ts`) are re-creatable and safe to delete or gitignore. `.scratchpad/` holds the image/video bytes referenced by `.scratchpad.json`; preserve both when sharing or backing up a canvas. Those assets cannot be recreated from the snapshot alone.
 - Prefer `.moi/.workspace.json` for state that describes the workspace itself rather than the person or device using it — e.g. chat/thread settings, widget layout, connectors. Litmus test: anyone who clones the workspace should get the same value.
 - Store per-user app state that should follow the local Moi installation in the server-side `DATA_DIR`. Expose it through the API and use React Query for client caching and optimistic updates.
 - Store per-browser or per-device UI preferences in `client/store/ui.ts`.
@@ -69,7 +69,7 @@ Use the vendored `agent-browser` skill only when the Browser plugin is unavailab
 
 To drive the app in a browser inside Claude Code on the web, use the vendored **agent-browser skill** (`.agents/skills/agent-browser/`). Cloud-specific setup — server startup, `AGENT_BROWSER_EXECUTABLE_PATH`, Playwright alternative, egress-relay caveats — is in `docs/browser-testing-cloud.md`.
 
-To exercise the OpenClaw harness (`server/harness/openclaw/`) in the same sandbox, follow `docs/openclaw-sandbox.md` — Node 24 via nvm, headless gateway bring-up, and the model-auth prerequisite.
+For OpenClaw protocol details and replay-test conventions, see `server/harness/openclaw/NOTES.md`. The old sandbox setup guide is no longer included; verify the installed OpenClaw runtime and gateway configuration before attempting a live test.
 
 ## Session Storage Notes
 

@@ -12,7 +12,10 @@ import type { MessageAttachment } from '@/lib/types'
 // §6; the rules that follow from it (who owns a tool card, why identity is
 // decided once) are worth reading before changing anything here.
 import { replayAttachmentParts } from '@/lib/moi-attachments'
-import { materializeAttachmentPaths, prepareAttachmentMessage } from '../../attachment-message'
+import {
+  materializeAttachmentPaths,
+  prepareAttachmentMessage
+} from '../../sessions/attachment-message'
 import { type MoiContext, appendMoiContext, renderMoiContext } from '@/lib/moi-context'
 import {
   type PreviewBlock,
@@ -46,7 +49,7 @@ import {
 } from './gateway'
 import { recordOpenClawThinkingProfile, recordOpenClawThinkingRejection } from './thinking'
 import { broadcast } from '../../state'
-import { renameSessionReferences } from '../../session-lifecycle'
+import { renameSessionReferences } from '../../sessions/lifecycle'
 
 type OpenClawSessionKey = string // the gateway-side composite key, e.g. `agent:main:main`
 

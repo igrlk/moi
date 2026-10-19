@@ -89,3 +89,12 @@ view available to retry. A running pending view can be closed, but not discarded
 `session_archived` notifications clear the chat from every connected browser's cache and local
 selections. Local selections become explicitly empty so they do not fall back to
 another server-selected chat. Unrelated selections and pins remain unchanged.
+
+## Implementation
+
+`server/sessions/view-sessions.ts` coordinates sends and view handoffs.
+`pending-views.ts` in the same directory owns pending-view persistence;
+`store.ts` owns session records, `selected.ts` owns selections and pins,
+`archive.ts` owns archiving, and `lifecycle.ts` coordinates ID renames.
+Compiled view manifests and build completion live in `server/applets/views.ts`.
+CLI creation and metadata commands live in `server/cli/commands/views.ts`.

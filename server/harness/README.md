@@ -90,9 +90,10 @@ server/harness/
   `sessionTitle`, `generateSessionTitle`, and `session-title.ts`. Chat naming is
   for client and UI labels. Thread naming stays at provider wire and RPC
   boundaries.
-- Outside code imports only this folder's top level. Documented exceptions:
-  `cli.ts` (`moi openclaw init` provisioning) imports
-  `harness/openclaw/discovery.ts`; tests may import harness internals.
+- Outside code imports this folder's top level. Provisioning exceptions are
+  `cli/commands/openclaw.ts`, `cli/commands/hermes.ts`, and `workspaces/import.ts`,
+  which use the corresponding provider's discovery module. Tests may import
+  harness internals.
 
 Current harnesses:
 
@@ -301,7 +302,7 @@ doubles as the evaluation rubric for new harnesses.
 ### Input capabilities
 
 - Images (base64 blocks vs data URLs vs file paths — a capability, not a given).
-- Attachments share `server/attachment-message.ts` for preparation and
+- Attachments share `server/sessions/attachment-message.ts` for preparation and
   `lib/moi-attachments.ts` for serialization and replay. Files and path-delivered
   images carry readable paths; inline images keep their native content blocks.
 - Rich content blocks vs plain-string prompts.

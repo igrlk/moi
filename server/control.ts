@@ -9,31 +9,31 @@ import { isWorkspaceTabId } from '@/lib/workspace-tabs'
 import { navigationRelay } from './navigation-relay'
 
 import { getAppConfig } from './app-config'
-import { clearAppletLog, getAppletLog, getAppletLogCount } from './applet-log'
-import { serializeWorkspaceBundle } from './bundle-queue'
+import { clearAppletLog, getAppletLog, getAppletLogCount } from './applets/log'
+import { serializeWorkspaceBundle } from './applets/bundle-queue'
 import { CONTROL_HOST, CONTROL_PORT, PORT } from './constants'
-import { applyEnvChanged } from './env-apply'
-import { callFunctionEphemeral, parseFunctionPath } from './functions'
-import { processIcon } from './icon'
-import { loadLayout, saveLayout } from './layout'
+import { applyEnvChanged } from './workspaces/env-apply'
+import { callFunctionEphemeral, parseFunctionPath } from './applets/functions'
+import { processIcon } from './workspaces/icon'
+import { loadLayout, saveLayout } from './workspaces/layout'
 import { publishEvent } from './events'
-import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './registry'
-import { requiredEnvFor } from './required-env'
-import { executeScratchOp } from './scratchpad-executor'
-import { readScratchpadImage, readScratchpadShapes } from './scratchpad'
-import { relayScratchOp } from './scratchpad-relay'
+import { findWorkspaceForPath, listWorkspaces, registerWorkspace } from './workspaces/registry'
+import { requiredEnvFor } from './workspaces/required-env'
+import { executeScratchOp } from './scratchpad/executor'
+import { readScratchpadImage, readScratchpadShapes } from './scratchpad/document'
+import { relayScratchOp } from './scratchpad/relay'
 import { broadcastAll } from './state'
-import { assembleTabRows, assertNavigableTab } from './tabs'
-import { applyThemeUpdate } from './theme'
-import { handleBundle } from './widgets'
-import { getWorkspaceViews, handleBundleViews } from './views'
-import { updatePendingView, PendingViewError } from './pending-views'
-import { createViewFromSession, ViewStartupError } from './view-sessions'
+import { assembleTabRows, assertNavigableTab } from './workspaces/tabs'
+import { applyThemeUpdate } from './workspaces/theme'
+import { handleBundle } from './applets/widgets'
+import { getWorkspaceViews, handleBundleViews } from './applets/views'
+import { updatePendingView, PendingViewError } from './sessions/pending-views'
+import { createViewFromSession, ViewStartupError } from './sessions/view-sessions'
 import {
   getWorkspaceConfig,
   setWorkspaceConfig,
   type WorkspaceConfigPatch
-} from './workspace-config'
+} from './workspaces/config'
 import { VERSION } from './version'
 import {
   getWorkspaceEnvView,
@@ -41,7 +41,7 @@ import {
   resolveWorkspaceEnv,
   secretBackend,
   updateWorkspaceEnv
-} from './workspace-env'
+} from './workspaces/env'
 
 type ControlSocket = { send(data: string): void }
 

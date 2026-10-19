@@ -13,7 +13,7 @@ import type { SessionInfo, WorkspaceSessionSelection, WorkspaceTabsState } from 
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import { reduceChatFrame } from '@/client/features/chat/connection/chat-frames'
-import { mergeLayoutForSave } from '@/server/layout'
+import { mergeLayoutForSave } from '@/server/workspaces/layout'
 
 import { readWorkspaceTabs, writeWorkspaceTabs } from './browser-tab-state'
 import {

@@ -12,8 +12,8 @@ import {
   BASE_DECLARATION_SOURCE_PATH,
   COLLAB_DECLARATION_SOURCE_PATH
 } from '../../applets/declarations'
-import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills-template'
-import { provisionWorkspace, skillsDirFor } from '../../workspace-init'
+import { COLLAB_REFERENCE_SOURCE_PATH } from '../../skills/template'
+import { provisionWorkspace, skillsDirFor } from '../../workspaces/init'
 import { installCollabSkill, removeCollabSkill } from './index'
 
 // This assignment is checked by tsc without importing React into the server.
