@@ -1,8 +1,8 @@
 # Harnesses
 
-A **harness** is an agent backend moi can drive: it receives user messages,
+A **harness** is an agent backend Moi can drive: it receives user messages,
 runs an agentic loop (model + tools) in a workspace, and streams back events
-that moi normalizes into its agent-agnostic display format.
+that Moi normalizes into its agent-agnostic display format.
 
 ## The layers
 
@@ -68,6 +68,7 @@ Socket-protocol notes the layers rely on (all defined in `lib/types.ts`):
 ```
 server/harness/
   README.md          this file
+  auth.ts            shared login lifecycle and readiness checks
   debug.ts           shared debug taps (wire + client-frame rings) for /dev/harness
   detect.ts          which harness owns a directory — `moi init`'s auto-detection
                      (Hermes profile → OpenClaw agent → Codex → Claude Code)
@@ -134,7 +135,7 @@ Hermes still implements; delete that block when agents move to
 Dev tooling: `/dev/harness` (live wire log + client frames + trigger
 scenarios for any workspace, backed by `GET /api/workspaces/:id/harness/debug`
 and the taps in `debug.ts`) and `codex/probe.ts` (drive the raw codex
-app-server protocol without moi).
+app-server protocol without Moi).
 
 ## Implementation status
 
@@ -185,8 +186,8 @@ per-chat model switching from the catalog `session/new` returns inline, and
 backend-generated session titles surfaced through `sessions_changed`. Agents are
 Hermes **profiles** — discovered from `$HERMES_HOME`, imported with
 `moi hermes init <profile>`, never created from the UI (OpenClaw's model).
-Sessions run in Hermes's `dont_ask` mode to match moi's bypass-permissions trust
-model. Known gaps: no mid-turn steering (moi queues instead), no subagent lanes,
+Sessions run in Hermes's `dont_ask` mode to match Moi's bypass-permissions trust
+model. Known gaps: no mid-turn steering (Moi queues instead), no subagent lanes,
 no reasoning-effort control, and `session/set_model` drops session-scoped MCP
 servers upstream. Two backend quirks are worked around in `acp/session.ts`:
 tool calls left unsettled at turn end are closed (Hermes never completes file
@@ -202,21 +203,41 @@ matches the picker even when Codex config names an unavailable model.
 
 Workspace env is fixed at process spawn. Executable lookup prefers PATH over
 the desktop bundle; config and credentials remain owned by Codex. Sessions use
-workspace-write access with network disabled, and moi automatically accepts
+workspace-write access with network disabled, and Moi automatically accepts
 supported permission requests. Command-approval UI, native question forms, and
 MCP elicitation are not implemented. See [Codex harness notes](codex/NOTES.md)
 for module ownership, ordering rules, runtime diagnostics, and boundaries.
 
-Workspace availability also checks provider authentication when a workspace is
-given. Claude Code is probed with `claude auth status` under the effective
-workspace env; `claude auth login` launches its browser sign-in from the composer. Codex
-uses app-server `account/read` and returns a browser OAuth URL through
-`account/login/start`. The server owns the recovery loop (`server/agent.ts`):
-`GET /api/workspaces/:id/agent` serves a cached availability snapshot alongside
-the model catalog, `POST .../auth/login` reuses a pending browser URL or restarts
-a URL-less provider flow, and a server-side watch loop re-probes until the login
-lands or times out, pushing `agent:updated` events to every tab. The composer
-renders that state; it never polls.
+### Authentication and readiness
+
+`auth.ts` owns cached readiness checks and one active login per harness.
+Login uses the server process environment; workspace readiness checks use each
+workspace's environment. Login credentials remain owned by the provider CLI.
+
+- **Claude Code:** `claude auth status` checks readiness. `claude auth login`
+  opens the browser callback URL locally, with a separate manual-code URL as a
+  fallback. Cloud uses the manual-code URL and writes the returned `code#state`
+  to the CLI's stdin.
+- **Codex:** `account/read` checks readiness; ChatGPT accounts also require a
+  successful `account/rateLimits/read` to detect expired credentials.
+  `account/login/start` uses browser OAuth locally and `chatgptDeviceCode` in
+  cloud. Local login opens the browser; cloud returns a URL and device code.
+
+`GET /api/harnesses/:type/auth` returns cached global readiness and login state.
+`POST /api/harnesses/:type/auth/login` starts or reuses an attempt;
+`POST /api/harnesses/:type/auth/login/:id/code` submits a manual authorization
+code. The attempt ID rejects submissions from an older login. Startup reports
+`starting`; `pending` includes an attempt ID and sign-in URL.
+
+During login, the server rechecks readiness until the provider confirms
+completion and readiness succeeds, or the attempt fails or reaches its
+ten-minute deadline. Shutdown cancels active attempts. Auth changes trigger
+independent readiness checks for registered workspaces using that harness,
+published as `harness:updated` events.
+
+`GET /api/workspaces/:id/agent` returns workspace readiness and the model
+catalog. Adding `?refresh=true` refreshes the shell PATH and bypasses the
+readiness cache.
 
 ## What a harness adapter must support
 
@@ -260,7 +281,7 @@ doubles as the evaluation rubric for new harnesses.
 - **Thinking/reasoning display mode** (Codex requests `summary: 'detailed'`
   so visible summaries do not depend on CLI defaults).
 - **Token streaming opt-in** (CC: `includePartialMessages`, construct-time;
-  Codex: always streams, moi gates forwarding).
+  Codex: always streams, Moi gates forwarding).
 - **Permissions / tool policy** — allowed tools, permission mode; backends
   with interactive approvals need a prompt-callback path.
 - **Env injection + cwd** — per-workspace env for the agent's shell, frozen at
@@ -301,14 +322,14 @@ doubles as the evaluation rubric for new harnesses.
 - Compaction trigger/observe.
 - Queued-message semantics: does the backend queue natively or must the
   server?
-- Push health/auth status events from the backend itself (the server watch
-  loop still discovers login completion by re-probing; a provider callback
-  would let `agent:updated` fire without polling anywhere).
+- Push unsolicited health/auth changes from providers, such as an external
+  sign-out. Login completion is already tracked; readiness checks are still
+  needed to detect changes outside an active login.
 
 ## Capability comparison
 
 Legend: ✅ supported · ⚠️ partial/workaround · ❌ missing. The Codex column
-describes what moi exposes, not every RPC available in the upstream protocol.
+describes what Moi exposes, not every RPC available in the upstream protocol.
 
 | Feature                  | Claude Agent SDK                                    | OpenClaw gateway          | Codex app-server                      | Hermes (ACP)                         |
 | ------------------------ | --------------------------------------------------- | ------------------------- | ------------------------------------- | ------------------------------------ |

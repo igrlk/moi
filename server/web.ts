@@ -6,8 +6,10 @@ import { isMoiContext } from '@/lib/moi-context'
 import { rm } from 'node:fs/promises'
 
 import index from '../client/index.html'
+import devSandbox from '../client/dev/index.html'
 import { api } from './api'
 import { getAppConfig } from './app-config'
+import { harnessStore } from './harness/auth'
 import { AttachmentUploadError } from './attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
@@ -149,6 +151,10 @@ export const app = Bun.serve<WsData>({
     '/': shell,
     '/dev': shell,
     '/dev/*': shell,
+    // Isolated sandboxes bypass app startup and share the client/dev entry point.
+    '/dev/workspace-setup/preview': prebuilt
+      ? new Response('Not found', { status: 404 })
+      : devSandbox,
     '/workspace/*': shell,
 
     // Chat websocket — app-wide (one per client, not per workspace). Each chat
@@ -304,6 +310,7 @@ async function shutdown() {
   try {
     control.stop(true)
   } catch {}
+  harnessStore.shutdown()
   for (const h of allHarnesses()) h.shutdown?.()
   killAllWorkers()
   killBuildWorkers()
