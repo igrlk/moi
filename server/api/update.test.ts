@@ -21,7 +21,7 @@ describe('update API', () => {
     const response = await api.request('/api/update', { method: 'POST' })
 
     expect(response.status).toBe(409)
-    expect(await response.text()).toBe('This Moi install cannot be updated from the app.')
+    expect(await response.text()).toBe('This Moi cannot be updated from the app')
   })
 
   test('refuses a second update while one is in flight', async () => {

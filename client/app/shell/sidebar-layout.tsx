@@ -1,11 +1,6 @@
 import { type ReactNode } from 'react'
 
-import {
-  IconAlertSquareRoundedFilled,
-  IconMessage2Share,
-  IconPlus,
-  IconSmartHome
-} from '@tabler/icons-react'
+import { IconMessage2Share, IconPlus, IconSandbox, IconSmartHome } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'wouter'
 
@@ -152,13 +147,20 @@ function SidebarFooterAction() {
 
   if (demo) {
     return (
-      <DemoDialog
-        trigger={
-          <Button size="icon" aria-label="Unlock all features" title="Unlock all features">
-            <IconAlertSquareRoundedFilled stroke={1.5} />
-          </Button>
-        }
-      />
+      <Tooltip>
+        <DemoDialog
+          trigger={
+            <TooltipTrigger
+              render={
+                <Button size="icon" aria-label="Set up Moi">
+                  <IconSandbox stroke={1.5} />
+                </Button>
+              }
+            />
+          }
+        />
+        <TooltipContent side="right">Set up Moi</TooltipContent>
+      </Tooltip>
     )
   }
 

@@ -1090,7 +1090,7 @@ api.post('/api/update', async c => {
 
   try {
     const result = await installUpdate()
-    if (!result) return c.text('This Moi install cannot be updated from the app.', 409)
+    if (!result) return c.text('This Moi cannot be updated from the app', 409)
     const response = c.json(result)
     scheduleRestartForUpdate()
     return response
