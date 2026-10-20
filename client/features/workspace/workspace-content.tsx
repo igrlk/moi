@@ -36,7 +36,6 @@ import { ViewManager } from '@/client/features/views/view-manager'
 import { getViewIcon, getViewLabel } from '@/client/features/views/view-presentation'
 import { useViewActions } from '@/client/features/views/use-view-actions'
 import { useViewDrafts } from '@/client/features/views/use-view-drafts'
-import { useFitsSplitLayout } from '@/client/features/workspace/use-fits-split-layout'
 import { useWorkspaceComposerState } from '@/client/features/chat/composer/use-workspace-composer-state'
 import { resolveWorkspaceTheme } from '@/lib/themes'
 import {
@@ -48,7 +47,6 @@ import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-lay
 import { WorkspaceMenu } from '@/client/features/workspace/workspace-menu'
 import { effectiveOpenTabs, tabAvailable } from '@/client/features/workspace/tab-resolution'
 import { useWorkspaceNavigation } from '@/client/features/workspace/use-workspace-navigation'
-import { cn } from '@/client/lib/cn'
 import { useWorkspaceEvent } from '@/client/runtime/use-workspace-events'
 import { useUiStore } from '@/client/store/ui'
 import {
@@ -58,17 +56,10 @@ import {
 } from '@/client/features/workspace/workspace-tabs'
 import { isDefaultWidget } from '@/lib/default-widgets'
 import { composerDraftKey, draftSessionId } from '@/lib/session-drafts'
-import type {
-  CompiledView,
-  LayoutMode,
-  PendingView,
-  ViewInfo,
-  WidgetInfo,
-  WorkspaceTabId
-} from '@/lib/types'
+import type { CompiledView, PendingView, ViewInfo, WidgetInfo, WorkspaceTabId } from '@/lib/types'
 import { viewIdFromTab, viewTabId } from '@/lib/workspace-tabs'
 
-import { WorkspaceSplitLayout } from './workspace-split-layout'
+import { WorkspaceFrame, WorkspacePane, useWorkspaceFrame } from './workspace-frame'
 import { UnavailablePage } from './unavailable-page'
 
 const Scratchpad = lazy(() =>
@@ -124,20 +115,15 @@ function tabItemFor(
 }
 
 export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentProps) {
-  const { layout, setLayout, workspaceId } = useWorkspaceLayoutCtx()
+  const { layout, workspaceId } = useWorkspaceLayoutCtx()
   const theme = resolveWorkspaceTheme(layout.theme)
   const viewActions = useViewActions()
-  const {
-    ref: rowRef,
-    fits: canUseSplit,
-    constraints: splitLayoutConstraints
-  } = useFitsSplitLayout<HTMLDivElement>()
+  const frame = useWorkspaceFrame()
+  const { mode, canUseSplit, setMode } = frame
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('idle')
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [chatFocusRequest, setChatFocusRequest] = useState(0)
   const pendingViewRefs = useRef(new Map<string, PendingViewHandle>())
-  const dockedChatWidth = useUiStore(state => state.dockedChatWidth)
-  const setDockedChatWidth = useUiStore(state => state.setDockedChatWidth)
   const sessionActivity = useLive(state => state.activity)
   const views = allViews.filter((view): view is CompiledView => view.status === 'compiled')
   const pendingViews = allViews.filter((view): view is PendingView => view.status !== 'compiled')
@@ -151,9 +137,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   const hasAppletWidgets = widgets.some(widget => !isDefaultWidget(widget.id))
   const hasWorkspaceApplets = hasAppletWidgets || views.length > 0
 
-  // Split needs enough row width; the saved mode remains the user's intent.
-  const wantsSplit = layout.layoutMode === 'split'
-  const mode: LayoutMode = wantsSplit && canUseSplit ? 'split' : 'fullscreen'
   const revealChat = useCallback(() => {
     setFloatingChatOpen(true)
     setChatFocusRequest(request => request + 1)
@@ -206,10 +189,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
 
   const openTabIds = effectiveOpenTabs(tabsState, allViews)
   const openSet = new Set(tabsState.open)
-
-  const setMode = (m: LayoutMode) => {
-    setLayout({ layoutMode: m })
-  }
 
   const canCloseTabs = openTabIds.length > 1
   const tabItems = openTabIds
@@ -462,12 +441,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
   )
 
   const workspacePanel = (
-    <div
-      className={cn(
-        '@container/workspace relative flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius,background-color] duration-100 ease-out motion-reduce:transition-none',
-        mode === 'split' && 'rounded-xl'
-      )}
-    >
+    <WorkspacePane mode={mode}>
       <div className="relative flex min-h-0 flex-1">
         <div
           ref={annotationTargetRef}
@@ -590,30 +564,16 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
           </Tooltip>
         )}
       </PanelHeader>
-    </div>
+    </WorkspacePane>
   )
 
   return (
-    <div
+    <WorkspaceFrame
+      frame={frame}
+      workspace={workspacePanel}
+      chat={dockedChat}
       onClick={onNavigationClick}
-      className="relative flex h-full min-h-0 flex-col font-sans text-foreground"
     >
-      <div ref={rowRef} className="flex min-h-0 flex-1">
-        {canUseSplit && splitLayoutConstraints ? (
-          <WorkspaceSplitLayout
-            {...splitLayoutConstraints}
-            workspace={workspacePanel}
-            chat={dockedChat}
-            open={mode === 'split'}
-            chatWidth={dockedChatWidth}
-            onCollapse={() => setMode('fullscreen')}
-            onChatWidthChange={setDockedChatWidth}
-          />
-        ) : (
-          workspacePanel
-        )}
-      </div>
-
       {mode === 'fullscreen' && (
         <ChatPopup
           agent={theme.agent}
@@ -636,6 +596,6 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
           )}
         </ChatPopup>
       )}
-    </div>
+    </WorkspaceFrame>
   )
 }

@@ -72,6 +72,7 @@ export function useWorkspaceSetup(
     ) : (
       (recovery ?? <WorkspaceLoadingState />)
     ),
-    ready: ready && !welcoming
+    ready: ready && !welcoming,
+    setupRequired: welcoming || !!recovery
   }
 }

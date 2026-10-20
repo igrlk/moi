@@ -15,7 +15,9 @@ import {
 } from '@/client/components/ui/dialog'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { Toaster } from '@/client/components/ui/toast'
-import { WorkspaceSetupPanel } from '@/client/features/workspace/setup/workspace-setup-panel'
+import { WorkspacePendingScreen } from '@/client/features/workspace/workspace-pending-screen'
+import { WorkspaceLayoutContext } from '@/client/features/workspace/workspace-layout-context'
+import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { useWorkspaceSetup } from '@/client/features/workspace/setup/workspace-setup'
 import { WorkspaceWelcomeState } from '@/client/features/workspace/setup/workspace-welcome-state'
 import { WorkspaceLoadingState } from '@/client/features/workspace/setup/workspace-recovery-states'
@@ -50,6 +52,7 @@ type SetupPreviewProps = {
 function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPreviewProps) {
   const [provider, setProvider] = useState<'browser' | 'code' | 'closed'>()
   const [deviceCode, setDeviceCode] = useState('')
+  const [layout, setLayout] = useState(createDefaultWorkspaceLayout)
   const auth = useHarnessAuth(harness)
   const pendingId = auth.data?.login?.state === 'pending' ? auth.data.login.id : undefined
   // Both local harnesses open the browser automatically.
@@ -112,20 +115,44 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
             </Button>
           ))}
         </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Layout">
+          {(['split', 'fullscreen'] as const).map(layoutMode => (
+            <Button
+              key={layoutMode}
+              size="sm"
+              variant={layout.layoutMode === layoutMode ? 'default' : 'secondary'}
+              onClick={() => setLayout(current => ({ ...current, layoutMode }))}
+            >
+              {layoutMode === 'split' ? 'Split' : 'Fullscreen'}
+            </Button>
+          ))}
+        </div>
       </header>
-      <main className="flex min-h-0 flex-1 overflow-y-auto">
-        {scenario === 'welcome' ? (
-          <WorkspaceSetupPanel>
-            <WorkspaceWelcomeState name="My workspace" workspaceType={harness} />
-          </WorkspaceSetupPanel>
-        ) : scenario === 'loading' ? (
-          <WorkspaceSetupPanel>
-            <WorkspaceLoadingState />
-          </WorkspaceSetupPanel>
-        ) : (
-          <SetupScreen />
-        )}
-      </main>
+      <WorkspaceLayoutContext
+        value={{
+          workspaceId: PREVIEW_WORKSPACE_ID,
+          layout,
+          setLayout: update => setLayout(current => ({ ...current, ...update })),
+          name: 'My workspace',
+          cwd: null,
+          provider: harness,
+          isLoading: false
+        }}
+      >
+        <main className="flex min-h-0 flex-1 overflow-y-auto bg-muted">
+          {scenario === 'welcome' ? (
+            <WorkspacePendingScreen setupRequired>
+              <WorkspaceWelcomeState name="My workspace" workspaceType={harness} />
+            </WorkspacePendingScreen>
+          ) : scenario === 'loading' ? (
+            <WorkspacePendingScreen>
+              <WorkspaceLoadingState />
+            </WorkspacePendingScreen>
+          ) : (
+            <SetupScreen />
+          )}
+        </main>
+      </WorkspaceLayoutContext>
       <Dialog
         open={providerPage !== 'closed'}
         onOpenChange={open => !open && setProvider('closed')}
@@ -172,7 +199,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
 
 function SetupScreen() {
   const [path] = useLocation()
-  const { content, ready } = useWorkspaceSetup(PREVIEW_WORKSPACE_ID)
+  const { content, ready, setupRequired } = useWorkspaceSetup(PREVIEW_WORKSPACE_ID)
   if (ready) return null
   return path === '/' ? (
     <div
@@ -182,7 +209,7 @@ function SetupScreen() {
       Workspace removed
     </div>
   ) : (
-    <WorkspaceSetupPanel>{content}</WorkspaceSetupPanel>
+    <WorkspacePendingScreen setupRequired={setupRequired}>{content}</WorkspacePendingScreen>
   )
 }
 

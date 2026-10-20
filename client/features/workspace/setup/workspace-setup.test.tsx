@@ -57,6 +57,7 @@ async function mount(
     window,
     document,
     HTMLElement: window.HTMLElement,
+    getComputedStyle: () => ({ getPropertyValue: () => '640px', fontSize: '16px' }),
     IS_REACT_ACT_ENVIRONMENT: true
   }
   const descriptors = new Map(
@@ -246,6 +247,9 @@ test('signed-out workspace shows only its own login and no workspace content', a
   const { document, contentSpy } = await mount()
   expect(contentSpy).not.toHaveBeenCalled()
   expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(
+    document.querySelector('[data-slot="workspace-pane"] [aria-label="Workspace setup"]')
+  ).not.toBeNull()
   expect(document.body.textContent).not.toContain('Claude Code')
   expect(document.body.textContent).not.toContain('Workspace settings')
   expect(document.querySelector('[data-content]')).toBeNull()
@@ -260,7 +264,10 @@ test('fresh readiness from home opens the workspace without another request', as
 
 test('one loading state waits for workspace content after readiness succeeds', async () => {
   const { document, setContentPending } = await mount({ status: 'available' }, false, false, true)
-  expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
+  expect(
+    document.querySelector('[data-slot="workspace-pane"] [aria-label="Loading"]')
+  ).not.toBeNull()
+  expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
   expect(document.querySelector('[data-content]')).toBeNull()
   await setContentPending(false)
   expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
@@ -288,7 +295,9 @@ test('a cold entry shows only a loading spinner until readiness is known', async
     </QueryClientProvider>
   )
   client.clear()
+  expect(html).toContain('data-slot="workspace-pane"')
   expect(html).toContain('aria-label="Loading"')
+  expect(html).not.toContain('aria-label="Workspace setup"')
   expect(html).not.toContain('Checking your agent')
   expect(html).not.toContain('<h1')
   expect(html).not.toContain('Workspace content')
@@ -383,6 +392,7 @@ test('cached sign-out waits for verification without briefly showing login', asy
   const check = Promise.withResolvers<HarnessAvailability>()
   const { document } = await mount(undefined, false, false, false, check.promise)
   expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
+  expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
   expect(document.body.textContent).not.toContain('Log in to ChatGPT')
   await act(async () => {
     check.resolve({ status: 'available' })
@@ -402,10 +412,15 @@ test('confirmed sign-out shows login and keeps it visible while retrying', async
     check.promise
   )
   expect(document.body.textContent).not.toContain('Log in to ChatGPT')
+  const pane = document.querySelector('[data-slot="workspace-pane"]')
+  expect(pane).not.toBeNull()
+  expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
   await act(async () => {
     check.resolve({ status: 'login-required', reason: 'Signed out' })
     await Bun.sleep(20)
   })
+  expect(document.querySelector('[data-slot="workspace-pane"]')).toBe(pane)
+  expect(pane?.querySelector('[aria-label="Workspace setup"]')).not.toBeNull()
   expect(document.body.textContent).toContain('Log in to ChatGPT')
   const retry = Promise.withResolvers<HarnessAvailability>()
   setCheck(retry.promise)

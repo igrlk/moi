@@ -1,0 +1,76 @@
+import type { MouseEventHandler, ReactNode } from 'react'
+
+import { cn } from '@/client/lib/cn'
+import { useUiStore } from '@/client/store/ui'
+import type { LayoutMode } from '@/lib/types'
+
+import { useFitsSplitLayout } from './use-fits-split-layout'
+import { useWorkspaceLayoutCtx } from './workspace-layout-context'
+import { WorkspaceSplitLayout } from './workspace-split-layout'
+
+export function useWorkspaceFrame(expanded = false) {
+  const { layout, setLayout } = useWorkspaceLayoutCtx()
+  const { ref, fits, constraints } = useFitsSplitLayout<HTMLDivElement>()
+  const chatWidth = useUiStore(state => state.dockedChatWidth)
+  const setChatWidth = useUiStore(state => state.setDockedChatWidth)
+  const mode: LayoutMode =
+    !expanded && fits && layout.layoutMode === 'split' ? 'split' : 'fullscreen'
+  const setMode = (layoutMode: LayoutMode) => setLayout({ layoutMode })
+
+  return { ref, canUseSplit: fits, constraints, mode, setMode, chatWidth, setChatWidth }
+}
+
+type WorkspaceFrameProps = {
+  frame: ReturnType<typeof useWorkspaceFrame>
+  workspace: ReactNode
+  chat?: ReactNode
+  children?: ReactNode
+  onClick?: MouseEventHandler<HTMLDivElement>
+}
+
+// Loading and ready content share the same pane geometry and saved chat width.
+export function WorkspaceFrame({ frame, workspace, chat, children, onClick }: WorkspaceFrameProps) {
+  const { ref, canUseSplit, constraints, mode, setMode, chatWidth, setChatWidth } = frame
+  return (
+    <div
+      onClick={onClick}
+      className="relative flex h-full min-h-0 flex-1 flex-col font-sans text-foreground"
+    >
+      <div ref={ref} className="flex min-h-0 flex-1">
+        {canUseSplit && constraints ? (
+          <WorkspaceSplitLayout
+            {...constraints}
+            workspace={workspace}
+            chat={chat}
+            open={mode === 'split'}
+            chatWidth={chatWidth}
+            onCollapse={() => setMode('fullscreen')}
+            onChatWidthChange={setChatWidth}
+          />
+        ) : (
+          workspace
+        )}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+type WorkspacePaneProps = {
+  mode: LayoutMode
+  children: ReactNode
+}
+
+export function WorkspacePane({ mode, children }: WorkspacePaneProps) {
+  return (
+    <div
+      data-slot="workspace-pane"
+      className={cn(
+        '@container/workspace relative flex h-full min-h-0 min-w-0 flex-1 flex-col-reverse overflow-hidden bg-background shadow-md transition-[border-radius,background-color] duration-100 ease-out motion-reduce:transition-none',
+        mode === 'split' && 'rounded-xl'
+      )}
+    >
+      {children}
+    </div>
+  )
+}
