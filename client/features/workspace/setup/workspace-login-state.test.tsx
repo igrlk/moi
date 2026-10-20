@@ -72,8 +72,8 @@ test('local Codex uses a browser link without code instructions', () => {
     }
   })
   expect(html).not.toContain('Cancel sign-in')
-  expect(html).toContain('Open browser')
-  expect(html).toContain('Sign in in your browser, then come back to Moi.')
+  expect(html).toContain('Open ChatGPT')
+  expect(html).toContain('Sign in to ChatGPT, then come back to Moi.')
   expect(html).not.toContain('Having trouble signing in?')
   expect(html).not.toContain('ChatGPT security settings')
   expect(html).not.toContain('Authorization code')
@@ -92,7 +92,7 @@ test('local Claude waits for the browser callback with the code fallback hidden'
   expect(html).toContain('Your workspace will open once you’re connected.')
   expect(html).toContain('Having trouble signing in?')
   expect(html).not.toContain('Authorization code')
-  expect(html).toContain('Open browser')
+  expect(html).toContain('Open Claude')
   expect(html).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback')
   expect(html).not.toContain('https://claude.com/oauth/manual')
 })
@@ -126,7 +126,7 @@ test('connected, failed, and loading states do not offer a misleading login', ()
   const failed = render('codex', 'cloud', {
     availability: { status: 'unavailable', reason: 'Network failed' }
   })
-  expect(failed).toContain('Could not check agent login status')
+  expect(failed).toContain('Could not check agent sign-in status')
   expect(failed).not.toContain('Continue')
   const loading = render('codex', 'local')
   expect(loading).not.toContain('Continue')
@@ -142,8 +142,8 @@ test('failed and expired login attempts still allow starting again', () => {
     expect(html).toContain(reason)
     expect(html).toContain('Continue')
     expect(html).not.toContain('Cancel sign-in')
-    expect(html).not.toContain('Sign in in your browser')
-    expect(html).not.toContain('Open browser')
+    expect(html).not.toContain('then come back to Moi')
+    expect(html).not.toContain('target="_blank"')
   }
 })
 
@@ -164,8 +164,8 @@ test('starting login keeps the button until the browser link is ready', () => {
       })
       expect(html).toContain('Continue')
       expect(html).toContain('disabled')
-      expect(html).not.toContain('Sign in in your browser')
-      expect(html).not.toContain('Open browser')
+      expect(html).not.toContain('then come back to Moi')
+      expect(html).not.toContain('target="_blank"')
     }
   }
 })

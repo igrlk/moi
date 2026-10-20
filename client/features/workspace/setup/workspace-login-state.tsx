@@ -76,7 +76,7 @@ export function WorkspaceLoginState({
             <Spinner className="size-6 self-center text-muted-foreground" stroke={1.5} />
           ) : checkError ? (
             <div role="alert" className="flex flex-col items-start gap-2">
-              <p>Could not check agent login status.</p>
+              <p>Could not check agent sign-in status.</p>
               <Button
                 variant="secondary"
                 disabled={auth.isFetching}
@@ -104,8 +104,8 @@ export function WorkspaceLoginState({
                 <>
                   <p role="status" className="text-sm text-muted-foreground">
                     {pending.codeUrl && !waitingForBrowser
-                      ? 'Sign in to get the authorization code.'
-                      : 'Sign in in your browser, then come back to Moi. Your workspace will open once you’re connected.'}
+                      ? `Sign in to ${name} to get the authorization code.`
+                      : `Sign in to ${name}, then come back to Moi. Your workspace will open once you’re connected.`}
                   </p>
                   <a
                     className={buttonVariants({ variant: 'secondary' })}
@@ -113,7 +113,7 @@ export function WorkspaceLoginState({
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Open browser
+                    Open {name}
                   </a>
                   {waitingForBrowser && pending.codeUrl && (
                     <Button variant="ghost" onClick={() => setManualLogin(true)}>
