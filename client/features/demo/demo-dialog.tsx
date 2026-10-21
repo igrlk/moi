@@ -160,7 +160,7 @@ function DemoDialogContent() {
             </li>
           </ul>
 
-          <Button render={<a href="https://run.moi.computer/cloud/login" />} className="mt-6">
+          <Button render={<a href="/cloud/login" />} className="mt-6">
             Sign in
             <IconArrowRight data-icon="inline-end" stroke={1.5} />
           </Button>
