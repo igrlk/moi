@@ -6,13 +6,13 @@ import type { UserProfile } from '@/lib/collab/types'
 import type * as HostStateModule from './host-state'
 import type { HostApi, HostUsers } from './host-state'
 
-const PROFILE_KEY = 'moi:collab:dev-profile'
+const PROFILE_KEY = 'moi:local-profile'
 const alice = { id: 'alice', name: 'Alice', color: 'emerald' } satisfies UserProfile
 const bob = { id: 'bob', name: 'Bob', color: 'blue' } satisfies UserProfile
 const carol = { id: 'cf-carol', color: 'emerald', email: 'carol@example.com' } as const
 const accessed = { provider: 'cloudflare-access', profile: carol } as const
 const descriptors = new Map(
-  ['window', 'sessionStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)])
+  ['window', 'localStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)])
 )
 let instance = 0
 
@@ -39,7 +39,7 @@ async function setup({
   host = {}
 }: SetupOptions = {}) {
   const saved = new Map<string, string>(profile ? [[PROFILE_KEY, JSON.stringify(profile)]] : [])
-  Object.defineProperty(globalThis, 'sessionStorage', {
+  Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
     value: {
       getItem: (key: string) => saved.get(key) ?? null,
@@ -75,11 +75,11 @@ test('installation exposes publishUsers alone and leaves local identity pending 
 })
 
 test('a saved local profile restores after confirmed local initialization', async () => {
-  const legacyProfile = { ...alice, id: 'dev-legacy' }
-  const collab = await setup({ profile: legacyProfile })
-  expect(collab.getCurrentUser()).toEqual(legacyProfile)
+  const savedProfile = { ...alice, id: 'local-saved' }
+  const collab = await setup({ profile: savedProfile })
+  expect(collab.getCurrentUser()).toEqual(savedProfile)
   expect(collab.getCurrentUserSource()).toBe('local')
-  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(legacyProfile)
+  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(savedProfile)
 })
 
 test('startup creates one local profile after configuration and identity checks, then autosaves the same id', async () => {
@@ -107,7 +107,7 @@ test('startup creates one local profile after configuration and identity checks,
   expect(collab.getDirectory()).toBeUndefined()
 })
 
-test('saved local users stay inactive until collaboration is enabled and the proxy check succeeds', async () => {
+test('saved local users stay inactive until local mode is confirmed and the proxy check succeeds', async () => {
   const collab = await setup({ profile: alice, initializeSaved: false })
   expect(collab.getCurrentUser()).toBeUndefined()
   collab.initializeLocalUser(false, {})
@@ -138,7 +138,7 @@ test('invalid or unavailable local storage still allows a confirmed local user',
   collab.initializeLocalUser(true, {})
   expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(collab.getCurrentUser())
   const inaccessible = await setup()
-  Object.defineProperty(globalThis, 'sessionStorage', {
+  Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
     value: {
       getItem: () => {
@@ -443,3 +443,40 @@ test.each(['__proto__', 'constructor', 'toString'])(
     expect(collab.getCurrentUser()).toEqual({ ...bob, id })
   }
 )
+
+test('storage changes synchronize local profiles without writing back or replacing external users', async () => {
+  const collab = await setup({ profile: alice })
+  let notices = 0
+  collab.subscribeCurrentUserStore(() => notices++)
+  collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: JSON.stringify(bob) })
+  expect(collab.getCurrentUser()).toEqual(bob)
+  expect(JSON.parse(collab.saved.get(PROFILE_KEY)!)).toEqual(alice)
+  expect(notices).toBe(1)
+  collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: 'bad' })
+  collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: JSON.stringify(bob) })
+  expect(notices).toBe(1)
+  collab.publishUsers({ me: 'alice', users: [alice] })
+  collab.receiveLocalProfile({ key: PROFILE_KEY, newValue: JSON.stringify(bob) })
+  expect(collab.getCurrentUser()).toEqual(alice)
+})
+
+test('storage subscription updates the profile and stops after cleanup', async () => {
+  const events = new EventTarget()
+  const host = {
+    moi: {},
+    addEventListener: events.addEventListener.bind(events),
+    removeEventListener: events.removeEventListener.bind(events)
+  }
+  const collab = await setup({ profile: alice, host })
+  const unsubscribe = collab.subscribeLocalProfileStorage()
+  const notify = (profile: UserProfile) => {
+    const event = new Event('storage')
+    Object.assign(event, { key: PROFILE_KEY, newValue: JSON.stringify(profile) })
+    events.dispatchEvent(event)
+  }
+  notify(bob)
+  expect(collab.getCurrentUser()).toEqual(bob)
+  unsubscribe()
+  notify(alice)
+  expect(collab.getCurrentUser()).toEqual(bob)
+})

@@ -4,7 +4,11 @@ import './structured-clone-shim'
 import 'blobatar/motion.css'
 import './index.css'
 
-import { initializeLocalUser, installHostApi } from './features/collab/host-state'
+import {
+  initializeLocalUser,
+  installHostApi,
+  subscribeLocalProfileStorage
+} from './features/collab/host-state'
 
 import { startHmrWatchdog } from './runtime/hmr-watchdog'
 
@@ -27,6 +31,7 @@ if (import.meta.hot) {
 // script runs right after this bundle and calls `window.moi.collab.publishUsers`
 // straight away, before the async startup below has finished.
 installHostApi()
+subscribeLocalProfileStorage()
 
 export async function init(el: HTMLElement) {
   // Startup config and any proxy-verified user load in parallel with the
@@ -36,7 +41,7 @@ export async function init(el: HTMLElement) {
     import('./api/app-config').then(m => m.loadAppConfig()),
     import('./features/collab/proxy-user').then(m => m.loadProxyUser())
   ])
-  initializeLocalUser(config?.experimental.collab === true, proxyUser)
+  initializeLocalUser(config?.environment === 'local' && !config.demo, proxyUser)
   mount(el)
 }
 

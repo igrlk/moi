@@ -40,7 +40,7 @@ export function localUserProfile(id: string, draft: LocalUserDraft): UserProfile
   return { id, ...(name ? { name } : {}), color: draft.color }
 }
 
-// The id stays with the tab through renames, so peers keep seeing one user.
+// The id stays with the browser through renames, so peers keep seeing one user.
 export function createLocalUser(): UserProfile {
   return localUserProfile(`local-${crypto.randomUUID().slice(0, 8)}`, randomLocalUser())
 }

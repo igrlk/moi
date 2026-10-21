@@ -19,8 +19,7 @@ export type HostApi = { publishUsers: (next: HostUsers) => void }
 // Who supplies the current user: local setup, an outer host, or an auth proxy.
 export type CurrentUserSource = 'local' | 'external' | AuthProvider
 
-// Keep the existing key so local profiles survive the startup change.
-const PROFILE_KEY = 'moi:collab:dev-profile'
+const PROFILE_KEY = 'moi:local-profile'
 const NO_USERS: readonly UserProfile[] = Object.freeze([])
 let currentUser: UserProfile | undefined
 let currentUserSource: CurrentUserSource | undefined
@@ -138,7 +137,7 @@ export function setProxyUserState({ provider, profile }: ProxyUserState): void {
 
 function persistLocalUser(): void {
   try {
-    sessionStorage.setItem(PROFILE_KEY, JSON.stringify(currentUser))
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(currentUser))
   } catch {
     /* Private browsing. */
   }
@@ -156,17 +155,17 @@ export function setLocalUser(next: UserProfile): void {
 
 // Called after startup config and proxy identity settle, before React mounts.
 // A host that has already published keeps the viewer it chose, signed in or not.
-export function initializeLocalUser(enabled: boolean, proxyUser: ProxyUserState | undefined): void {
-  if (!enabled || !proxyUser || proxyUser.provider !== undefined || currentUserSource !== undefined)
+export function initializeLocalUser(local: boolean, proxyUser: ProxyUserState | undefined): void {
+  if (!local || !proxyUser || proxyUser.provider !== undefined || currentUserSource !== undefined)
     return
   try {
-    const saved = sessionStorage.getItem(PROFILE_KEY)
+    const saved = localStorage.getItem(PROFILE_KEY)
     if (saved) {
       setLocalUser(JSON.parse(saved) as UserProfile)
       return
     }
   } catch {
-    /* Invalid or unavailable storage starts a fresh local profile. */
+    // Invalid or unavailable storage starts a fresh local profile.
   }
   setLocalUser(createLocalUser())
 }
@@ -180,4 +179,22 @@ export function installHostApi(): void {
   host.moi ??= {}
   const api: HostApi = { publishUsers }
   host.moi.collab = api
+}
+
+// Storage events update this tab without writing back and triggering another event.
+export function receiveLocalProfile(event: Pick<StorageEvent, 'key' | 'newValue'>): void {
+  if (event.key !== PROFILE_KEY || !event.newValue || currentUserSource !== 'local') return
+  try {
+    const profile = normalizeUserProfile(JSON.parse(event.newValue) as UserProfile)
+    if (sameProfile(profile, currentUser)) return
+    currentUser = profile
+    listeners.forEach(listener => listener())
+  } catch {
+    // Ignore corrupt values from other tabs.
+  }
+}
+
+export function subscribeLocalProfileStorage(): () => void {
+  window.addEventListener('storage', receiveLocalProfile)
+  return () => window.removeEventListener('storage', receiveLocalProfile)
 }
