@@ -102,7 +102,7 @@ does not spawn one per card.
 Workspace import discovery separately reads up to 400 recent rollout heads
 under the server's `$CODEX_HOME/sessions`, without requiring a CLI executable.
 
-## Models, effort, and fast mode
+## Models, effort, and speed modes
 
 `model/list` is the source of picker capabilities. The catalog is paginated,
 filters hidden rows, and is cached per client for one minute. Login/account
@@ -120,14 +120,19 @@ Changing a selection does not retry an earlier failed message.
 Configured reasoning effort applies when supported by the selected model;
 otherwise the adapter uses its advertised default. Fast mode is available when
 `serviceTiers` includes `priority`. Only catalogs missing that field fall back
-to `additionalSpeedTiers: ["fast"]`. A non-null configured tier takes precedence
-over the catalog default.
+to `additionalSpeedTiers: ["fast"]`. Ultrafast uses the same capability check for
+`ultrafast`, including the legacy fallback only when `serviceTiers` is missing.
+The picker cycles regular → fast → ultrafast → regular, skipping unavailable
+tiers. Moi stores `speedMode` as `normal`, `fast`, or `ultrafast`.
 
-| Moi fast-mode setting | Native `serviceTier`                     |
-| --------------------- | ---------------------------------------- |
-| On                    | `"priority"`                             |
-| Off                   | `null`                                   |
-| Unset                 | Omitted; inherits the config/thread tier |
+| Moi speed mode  | Native `serviceTier` |
+| --------------- | -------------------- |
+| Normal or unset | `null`               |
+| Fast            | `"priority"`         |
+| Ultrafast       | `"ultrafast"`        |
+
+When the catalog is available, UI sends resolve speed against model capabilities.
+Unsupported Ultrafast falls back to Fast when supported, otherwise Normal.
 
 Model, effort, and tier changes apply on the next **new turn**. `turn/steer`
 has no fields for changing them during an active turn. Moi uses the persistent

@@ -18,6 +18,7 @@ Agent chat UI powered by Claude Agent SDK, Bun, React, and Tailwind.
   - `animations.md` (`*.tsx`, `*.css`) — `tw-animate-css` utilities, no custom keyframes
   - `bun.md` — Bun instead of Node/npm/vite, Bun-native APIs
   - `pull-requests.md` (before creating or updating a PR) — description format, length budget, update-on-pivot
+  - `visual-tests.md` (`*.tsx`, `*.css`) — a visual test in the same change as any new screen, component, or state
   - `README.md` — format for writing new rules
 - `.agents/skills/` — skills in the `SKILL.md` [Agent Skills](https://agentskills.io) format (canonical). Codex and other tools that follow the standard discover this directory natively; Claude Code loads them via per-skill symlinks in `.claude/skills/`. When adding a skill, put it in `.agents/skills/<name>/` and add a matching symlink in `.claude/skills/`.
 
@@ -25,7 +26,7 @@ Claude-only config (`.claude/settings.json` hooks, `.claude/launch.json`) stays 
 
 ## File naming and references
 
-- Use kebab-case for repo-owned files and folders, including components, hooks, utilities, and tests: `chat-panel.tsx`, `use-chat.ts`, `chat-panel.test.tsx`. Keep suffixes such as `.test.ts`, `.render.test.tsx`, `.server.ts`, and `.d.ts`.
+- Use kebab-case for repo-owned files and folders, including components, hooks, utilities, and tests: `chat-panel.tsx`, `use-chat.ts`, `chat-panel.test.tsx`. Keep suffixes such as `.test.ts`, `.server.ts`, and `.d.ts`.
 - Keep React components and types in PascalCase (`ChatPanel`, `ChatPanelProps`), and functions, hooks, and variables in camelCase (`useChat`). Filename casing does not change exported identifiers.
 - Preserve established instruction/document names (`AGENTS.md`, `README.md`, `SKILL.md`, `DESIGN.md`, `TESTING.md`, `NOTES.md`, `LICENSE`), bundled skill reference names, established fixture folders such as `__fixtures__`, and vendored files. These are explicit exceptions.
 - When moving, renaming, or deleting files, update imports, lazy imports, test mocks, scripts, comments, and documentation references in the same change. Search for both the old full path and filename, including hidden agent instructions and skills. Historical notes may retain old paths when clearly marked as historical and paired with current guidance.
@@ -55,12 +56,14 @@ Read [TESTING.md](TESTING.md) when deciding what test coverage a change needs.
 
 ### Dev mode
 
+Use the Bun version in `package.json`'s `packageManager` field or newer.
+
 `bun run dev` starts a small supervisor that runs the server **without `bun --hot`**:
 
-- **Frontend (`client/`)** — hot-reloaded in place by `Bun.serve`'s dev bundler (HMR). Edit a React component and the browser updates; no restart.
+- **Frontend (`client/`)** — changes refresh components or reload the page automatically. No server restart needed.
 - **Server (`server/`, `lib/`)** — the supervisor watches these and does a **full process restart** on change (graceful `SIGTERM` → close servers, kill function workers, respawn). Module state is rebuilt cleanly each time.
 
-Do **not** start the server with `bun --hot server/web.ts` or the old `moi start --dev` path: `bun --hot` soft-reloads server modules in place, which churns the dev bundler's chunk hashes and serves **stale frontend bundles** (the symptom: edits don't show up, browser keeps old code). The supervisor exists specifically to avoid this.
+Do **not** use `bun --hot server/web.ts`; it can leave the browser serving stale frontend bundles. `moi start --dev` uses the same supervisor as `bun run dev`.
 
 Only one server runs at a time — it binds port 13337 (HTTP) and 13059 (control). To restart, kill the existing `bun run dev` process and start it again; a second instance fails on the control port.
 

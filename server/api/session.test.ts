@@ -1,15 +1,11 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { DEFAULT_WORKSPACE_STATE_ROOT, setWorkspaceStateRoot } from '../workspace-state'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { api } from './index'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import {
-  DEFAULT_SESSION_STORE_PATH,
-  getSessionRecord,
-  patchSessionRecord,
-  setSessionStorePath
-} from '../sessions/store'
+import { getSessionEntry, updateSessionEntry } from '../sessions/store'
 import { harnessFor } from '../harness/registry'
 import type { StreamEvent } from '@/lib/types'
 
@@ -17,11 +13,11 @@ let directory: string
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'moi-api-session-'))
   setRegistryPath(join(directory, 'workspaces.json'))
-  setSessionStorePath(join(directory, 'sessions.json'))
+  setWorkspaceStateRoot(join(directory, 'state'))
 })
 afterEach(async () => {
   setRegistryPath(DEFAULT_REGISTRY_PATH)
-  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   await rm(directory, { recursive: true, force: true })
 })
 
@@ -43,16 +39,16 @@ test('history retries without changing a fork cutoff', async () => {
     expect((await api.request(path)).status).toBe(500)
     failRead = false
     expect((await api.request(path)).status).toBe(200)
-    await patchSessionRecord(workspace.path, 'child', { forkedFromSessionId: 'parent' })
+    await updateSessionEntry(workspace, 'child', { fork: { fromSessionId: 'parent' } })
     failRead = true
     expect((await api.request(path)).status).toBe(500)
-    expect(await getSessionRecord(workspace.path, 'child')).toEqual({
-      forkedFromSessionId: 'parent'
+    expect(await getSessionEntry(workspace, 'child')).toEqual({
+      fork: { fromSessionId: 'parent' }
     })
     failRead = false
     expect((await api.request(path)).status).toBe(200)
-    expect(await getSessionRecord(workspace.path, 'child')).toEqual({
-      forkedFromSessionId: 'parent'
+    expect(await getSessionEntry(workspace, 'child')).toEqual({
+      fork: { fromSessionId: 'parent' }
     })
     history = [
       {
@@ -66,8 +62,8 @@ test('history retries without changing a fork cutoff', async () => {
       }
     ]
     expect((await api.request(path)).status).toBe(200)
-    expect(await getSessionRecord(workspace.path, 'child')).toEqual({
-      forkedFromSessionId: 'parent'
+    expect(await getSessionEntry(workspace, 'child')).toEqual({
+      fork: { fromSessionId: 'parent' }
     })
     expect(reads).toBe(5)
   } finally {
@@ -75,28 +71,30 @@ test('history retries without changing a fork cutoff', async () => {
   }
 })
 
-test('reads one session record and preserves provenance when updating or clearing config', async () => {
+test('changing chat settings keeps the chat’s tab and fork history', async () => {
   const workspace = await registerWorkspace(join(directory, 'workspace'), { type: 'claude-code' })
-  const path = `/api/workspaces/${workspace.id}/sessions/child`
-  const metadata = {
+  const entry = {
     tabId: 'scratchpad' as const,
-    forkedFromSessionId: 'parent',
-    forkedThroughMessageId: 'boundary'
+    fork: { fromSessionId: 'parent', throughMessageId: 'boundary' }
   }
-  await patchSessionRecord(workspace.path, 'child', metadata)
+  await updateSessionEntry(workspace, 'child', entry)
   const patch = (body: unknown) =>
-    api.request(`${path}/config`, {
-      method: 'PUT',
+    api.request(`/api/workspaces/${workspace.id}/sessions/child/config`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     })
-  const saved = await patch({ model: 'sonnet', fastMode: false })
+  const saved = await patch({ model: 'sonnet', speedMode: 'normal' })
   expect(saved.status).toBe(200)
-  const expected = { ...metadata, config: { model: 'sonnet', fastMode: false } }
-  expect(await saved.json()).toEqual(expected)
-  expect(await (await api.request(path)).json()).toEqual(expected)
-  expect(await (await patch({ model: null, fastMode: null })).json()).toEqual(metadata)
-  expect(
-    await (await api.request(`/api/workspaces/${workspace.id}/sessions/fresh`)).json()
-  ).toEqual({})
+  expect((await saved.json()).sessions.child).toEqual({
+    ...entry,
+    config: { model: 'sonnet', speedMode: 'normal' }
+  })
+  const ultrafast = await patch({ speedMode: 'ultrafast' })
+  expect(ultrafast.status).toBe(200)
+  expect((await ultrafast.json()).sessions.child.config.speedMode).toBe('ultrafast')
+  expect((await patch({ speedMode: 'turbo' })).status).toBe(400)
+  expect((await (await patch({ model: null, speedMode: null })).json()).sessions.child).toEqual(
+    entry
+  )
 })

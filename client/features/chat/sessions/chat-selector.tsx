@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { IconArchive, IconEdit, IconHistory, IconPin, IconPinFilled } from '@tabler/icons-react'
 
 import { useArchiveWorkspaceSession, useWorkspaceSessions } from './api'
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useWorkspaceId } from '@/client/features/workspace/workspace-context'
 import {
   useSelectedSession,
@@ -14,7 +14,6 @@ import { isSessionRunning, liveStore, useLive } from '@/client/features/chat/cha
 import type { SessionInfo, WorkspaceTabId } from '@/lib/types'
 
 import { Button } from '@/client/components/ui/button'
-import { toast } from '@/client/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/client/components/ui/tooltip'
 import {
   DropdownMenu,
@@ -89,7 +88,7 @@ export function ChatSessionItem({
     try {
       await onArchive(session.sessionId)
     } catch {
-      toast.add({ title: 'Couldn’t archive chat', type: 'error' })
+      // The archive request already reported the failure.
     } finally {
       pendingRef.current = false
       setPending(false)
@@ -248,7 +247,7 @@ export function groupSessionsForTab(
 
 export function ChatSelector({ className }: ChatSelectorProps) {
   const workspaceId = useWorkspaceId()
-  const { pinnedSessionId, loaded, pin } = usePinnedSession()
+  const { pinnedSessionId, loaded, pin, unpin } = usePinnedSession()
   const [selectedSessionId] = useSelectedSession()
   const { data: sessions = [] } = useWorkspaceSessions(workspaceId)
   if (!loaded) return null
@@ -271,7 +270,7 @@ export function ChatSelector({ className }: ChatSelectorProps) {
                 variant="ghost"
                 size="icon-sm"
                 className={className}
-                onClick={() => pin(null)}
+                onClick={unpin}
                 aria-label="Unpin chat"
                 aria-pressed={true}
               >
@@ -316,7 +315,7 @@ function SessionSelector({ className, sessions }: SessionSelectorProps) {
   const tabId = useCurrentTabId()
   const [selectedSessionId, selectSession] = useSelectedSession()
   const [confirmingSessionId, setConfirmingSessionId] = useState<string | null>(null)
-  const canArchive = useWorkspaceAgent(workspaceId).data?.supportsArchiving === true
+  const canArchive = useWorkspaceHarness(workspaceId).data?.supportsArchiving === true
   const archiveSession = useArchiveWorkspaceSession(workspaceId)
   const sessionGroups = groupSessionsForTab(sessions, tabId)
 

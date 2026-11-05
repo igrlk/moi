@@ -11,13 +11,16 @@ import {
   startOptimisticSession
 } from '@/client/features/chat/chat-send'
 import {
-  optimisticallySetSelectedSession,
   renameSelectedSessionInCache,
+  setSelectedSessionInCache,
   usePinnedSession
 } from '@/client/features/chat/sessions/use-selected-session'
-import { workspaceKeys } from '@/client/api/workspace-keys'
+import {
+  changeWorkspaceStateCache,
+  getCachedWorkspaceState
+} from '@/client/features/workspace/workspace-state'
 import { useCollabEnabled } from '@/client/features/collab'
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useWorkspaceLayoutCtx } from '@/client/features/workspace/workspace-layout-context'
 import {
   useCreateView,
@@ -26,7 +29,7 @@ import {
   useSubmitView
 } from '@/client/features/views/api'
 import { recoverViewSubmission } from './view-submission'
-import type { PendingView, SessionRecord, ViewInfo } from '@/lib/types'
+import type { PendingView } from '@/lib/types'
 import { viewTabId } from '@/lib/workspace-tabs'
 
 export function useViewActions() {
@@ -35,7 +38,7 @@ export function useViewActions() {
   const selectionScope = collabEnabled ? 'browser-tab' : 'shared'
   const { workspaceId, layout } = useWorkspaceLayoutCtx()
   const { pinnedSessionId } = usePinnedSession()
-  const modelData = useWorkspaceAgent(workspaceId).data
+  const modelData = useWorkspaceHarness(workspaceId).data
   const createMutation = useCreateView(workspaceId)
   const saveMutation = useSaveViewDraft(workspaceId)
   const submitMutation = useSubmitView(workspaceId)
@@ -64,7 +67,7 @@ export function useViewActions() {
       })
     if (!pinnedSessionId) {
       moveChatDraft(workspaceId, draftId, sessionId)
-      optimisticallySetSelectedSession(
+      setSelectedSessionInCache(
         queryClient,
         workspaceId,
         sessionId,
@@ -77,23 +80,19 @@ export function useViewActions() {
       attachments
     )
 
-    const config = queryClient.getQueryData<SessionRecord>(
-      workspaceKeys.session(workspaceId, sessionId)
-    )?.config
-    const { model, effort, fastMode, stream } = resolveChatRunOptions(
+    const config = getCachedWorkspaceState(queryClient, workspaceId)?.sessions[sessionId]?.config
+    const { model, effort, speedMode, stream } = resolveChatRunOptions(
       modelData,
       config?.model ?? layout.selectedModel,
       config?.effort ?? layout.selectedEffort,
-      config?.fastMode ?? layout.selectedFastMode
+      config?.speedMode ?? layout.selectedSpeedMode
     )
 
-    queryClient.setQueryData<ViewInfo[]>(workspaceKeys.views(workspaceId), views =>
-      views?.map(view =>
-        view.id === pendingView.id && view.status === 'draft'
-          ? { ...view, status: 'starting', requirements: text, executionSessionId: sessionId }
-          : view
-      )
-    )
+    changeWorkspaceStateCache(queryClient, workspaceId, draft => {
+      const view = draft.pendingViews[pendingView.id]
+      if (view?.status === 'draft')
+        Object.assign(view, { status: 'starting', requirements: text, buildSessionId: sessionId })
+    })
 
     try {
       const result = await submitMutation.mutateAsync({
@@ -109,13 +108,13 @@ export function useViewActions() {
           : {}),
         model,
         effort,
-        fastMode,
+        speedMode,
         stream
       })
       moveChatDraft(workspaceId, sessionId, result.sessionId)
       renameSelectedSessionInCache(queryClient, workspaceId, sessionId, result.sessionId)
       if (!pinnedSessionId)
-        optimisticallySetSelectedSession(
+        setSelectedSessionInCache(
           queryClient,
           workspaceId,
           result.sessionId,

@@ -1,8 +1,10 @@
+import type { SpeedMode } from '@/lib/types'
 // The harness contract: what an agent backend must implement to be drivable
 // by moi. See README.md in this folder for the full checklist and the
 // message-type layers; each harness's index.ts exports one Harness object
 // wrapping its session/adapter/transport modules.
 import type { MessageAttachment } from '@/lib/types'
+import type { ZodType } from 'zod'
 import type { MoiContext } from '@/lib/moi-context'
 import type {
   HarnessAvailability,
@@ -20,7 +22,7 @@ import type {
 // The superset of what any backend needs to accept a user message; harnesses
 // ignore fields they don't support. OpenClaw honors model + effort (applied via
 // sessions.patch) and stream (token previews), but has no Fast-mode setting so
-// it ignores fastMode; agentId is OpenClaw-only (the gateway agent that owns
+// it ignores speedMode; agentId is OpenClaw-only (the gateway agent that owns
 // the workspace).
 export type HarnessLoginAttempt = HarnessLogin & {
   completed?: Promise<void>
@@ -39,7 +41,7 @@ export type SendMessageInput = {
   optimisticId?: string
   model?: string
   effort?: string
-  fastMode?: boolean
+  speedMode?: SpeedMode
   stream?: boolean
   // Structured moi context (lib/moi-context.ts). Each harness renders and
   // injects it its own way: Claude Code as a leading system-reminder text
@@ -81,9 +83,31 @@ export type DiscoveredWorkspaceCandidate = {
 
 export type HarnessWorkspace = Pick<WorkspaceEntry, 'id' | 'path' | 'type' | 'agentId'>
 
+export type ActionModel = 'fast' | 'normal' | 'smart'
+
+export type HarnessActionInput<TResult = unknown, TProgress = never> = {
+  prompt: string
+  // Portable model and effort choice, resolved by each harness. Defaults to normal.
+  model?: ActionModel
+  resultSchema: ZodType<TResult>
+  signal: AbortSignal
+} & (
+  | { progressSchema?: never; onProgress?: never }
+  | {
+      progressSchema: ZodType<TProgress>
+      onProgress: (progress: TProgress) => void | Promise<void>
+    }
+)
+
 export type Harness = {
   id: WorkspaceType
   capabilities: HarnessCapabilities
+
+  // Ephemeral read/search action without a workspace or visible chat.
+  // Validates structured output against resultSchema; callers control timeout.
+  runAction?<TResult, TProgress = never>(
+    input: HarnessActionInput<TResult, TProgress>
+  ): Promise<TResult>
 
   // -- chat lifecycle ---------------------------------------------------------
   sendMessage(input: SendMessageInput): Promise<void>

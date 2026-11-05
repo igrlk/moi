@@ -1,15 +1,8 @@
-import { mkdir, rename } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-import { isAppIconId } from '@/lib/app-icons'
+import { isIdentityIconId } from '@/lib/identity-icons'
 import { newViewId } from '@/lib/ids'
-import type { PendingView, WorkspaceEntry } from '@/lib/types'
-import { DATA_DIR } from '../data-dir'
-import { publishEvent } from '../events'
+import type { PendingView, WorkspaceEntry, WorkspaceState } from '@/lib/types'
+import { readWorkspaceState, updateWorkspaceState, type WorkspaceRef } from '../workspace-state'
 import { archiveViewSessions } from './archive'
-
-type Store = Record<string, PendingView[]>
-let storePath = join(DATA_DIR, 'pending-views.json')
-let writes: Promise<unknown> = Promise.resolve()
 
 export class PendingViewError extends Error {
   constructor(
@@ -19,100 +12,84 @@ export class PendingViewError extends Error {
     super(message)
   }
 }
-export function setPendingViewStorePath(path: string) {
-  storePath = path
+
+type PendingViewState = Omit<PendingView, 'id'>
+type PendingViewPatch = Partial<
+  Pick<PendingView, 'status' | 'requirements' | 'buildSessionId' | 'error'>
+>
+
+function applyPatch(view: PendingViewState, patch: PendingViewPatch): void {
+  Object.assign(view, patch)
+  for (const key of Object.keys(view) as (keyof PendingViewState)[])
+    if (view[key] === undefined) delete view[key]
 }
-async function read(): Promise<Store> {
-  const file = Bun.file(storePath)
-  return (await file.exists()) ? file.json() : {}
+
+export async function listPendingViews(ws: WorkspaceRef): Promise<PendingView[]> {
+  const { pendingViews } = await readWorkspaceState(ws)
+  return Object.entries(pendingViews).map(([id, view]) => ({ id, ...view }))
 }
-export async function listPendingViews(path: string): Promise<PendingView[]> {
-  await writes
-  return (await read())[path] ?? []
+
+export async function getPendingView(ws: WorkspaceRef, id: string) {
+  const view = (await readWorkspaceState(ws)).pendingViews[id]
+  return view ? { id, ...view } : undefined
 }
-export async function getPendingView(path: string, id: string) {
-  return (await listPendingViews(path)).find(view => view.id === id)
-}
-function changed(workspaceId: string) {
-  publishEvent({ type: 'views:changed', workspaceId })
-}
-async function update<T>(workspaceId: string, path: string, mutate: (views: PendingView[]) => T) {
-  const run = writes.then(async () => {
-    const store = await read()
-    const views = (store[path] ??= [])
-    const result = await mutate(views)
-    if (!views.length) delete store[path]
-    await mkdir(dirname(storePath), { recursive: true })
-    const temp = `${storePath}.${process.pid}.tmp`
-    await Bun.write(temp, JSON.stringify(store, null, 2))
-    await rename(temp, storePath)
-    changed(workspaceId)
-    return result
-  })
-  writes = run.catch(() => {})
-  return run
-}
+
 export async function createPendingView(
-  workspaceId: string,
-  path: string,
-  input: Partial<Pick<PendingView, 'status' | 'requirements' | 'executionSessionId' | 'error'>> = {}
-) {
-  return update(workspaceId, path, views => {
-    const view: PendingView = {
-      id: newViewId(),
-      status: 'draft',
-      requirements: '',
-      ...input
-    }
-    views.push(view)
-    return view
+  ws: WorkspaceRef,
+  input: PendingViewPatch = {}
+): Promise<PendingView> {
+  const id = newViewId()
+  return updateWorkspaceState(ws, state => {
+    const created: PendingViewState = { status: 'draft', requirements: '' }
+    applyPatch(created, input)
+    state.pendingViews[id] = created
+    return { id, ...created }
   })
 }
+
 export async function patchPendingView(
-  workspaceId: string,
-  path: string,
+  ws: WorkspaceRef,
   id: string,
-  patch: Partial<Pick<PendingView, 'status' | 'requirements' | 'executionSessionId' | 'error'>>,
+  patch: PendingViewPatch,
   expectedStatus?: PendingView['status']
 ) {
-  return update(workspaceId, path, views => {
-    const view = views.find(view => view.id === id)
+  return updateWorkspaceState(ws, state => {
+    const view = state.pendingViews[id]
     // A bundle can complete while a send is being accepted.
-    if (!view || (expectedStatus && view.status !== expectedStatus)) return view
-    Object.assign(view, patch)
-    return view
+    if (!view) return undefined
+    if (!expectedStatus || view.status === expectedStatus) applyPatch(view, patch)
+    return { id, ...view }
   })
 }
-export async function beginViewBuild(
-  workspaceId: string,
-  path: string,
+
+// Move a draft to `starting` inside a state transaction.
+export function startViewBuild(
+  state: WorkspaceState,
   id: string,
   requirements: string,
   sessionId: string,
   hasAttachments: boolean
-) {
+): PendingView {
   if (!requirements.trim() && !hasAttachments)
     throw new PendingViewError('View requirements or an attachment are required')
-  return update(workspaceId, path, views => {
-    const view = views.find(view => view.id === id)
-    if (!view) throw new PendingViewError('Pending view not found', 404)
-    if (view.status !== 'draft') throw new PendingViewError('View has already been submitted', 409)
-    view.status = 'starting'
-    view.requirements = requirements.trim()
-    view.executionSessionId = sessionId
-    return view
-  })
+  const view = state.pendingViews[id]
+  if (!view) throw new PendingViewError('Pending view not found', 404)
+  if (view.status !== 'draft') throw new PendingViewError('View has already been submitted', 409)
+  view.status = 'starting'
+  view.requirements = requirements.trim()
+  view.buildSessionId = sessionId
+  return { id, ...view }
 }
+
 export async function updatePendingView(
-  workspaceId: string,
-  path: string,
+  ws: WorkspaceRef,
   id: string,
   input: { requirements?: string; title?: string; icon?: string }
 ) {
-  if (input.icon !== undefined && !isAppIconId(input.icon))
+  if (input.icon !== undefined && !isIdentityIconId(input.icon))
     throw new PendingViewError(`Unknown view icon id "${input.icon}"`)
-  return update(workspaceId, path, views => {
-    const view = views.find(view => view.id === id)
+  return updateWorkspaceState(ws, state => {
+    const view = state.pendingViews[id]
     if (!view) throw new PendingViewError('Pending view not found', 404)
     if (input.requirements !== undefined) {
       if (view.status !== 'draft')
@@ -121,44 +98,38 @@ export async function updatePendingView(
     }
     if (input.title !== undefined) view.title = input.title
     if (input.icon !== undefined) view.icon = input.icon
-    return view
+    return { id, ...view }
   })
 }
-export async function completeViewBuild(workspaceId: string, path: string, id: string) {
-  if (!(await getPendingView(path, id))) return
-  await update(workspaceId, path, views => {
-    const index = views.findIndex(view => view.id === id)
-    if (index !== -1) views.splice(index, 1)
+
+export async function completeViewBuild(ws: WorkspaceRef, id: string) {
+  await updateWorkspaceState(ws, state => {
+    delete state.pendingViews[id]
   })
 }
-export async function renameViewExecutionSession(
-  workspaceId: string,
-  path: string,
-  from: string,
-  to: string
-) {
-  if (!(await listPendingViews(path)).some(view => view.executionSessionId === from)) return
-  await update(workspaceId, path, views => {
-    for (const view of views) {
-      if (view.executionSessionId === from) view.executionSessionId = to
-    }
-  })
+
+// Follow a temporary id's rename in every build that runs in it.
+export function renameBuildSession(state: WorkspaceState, from: string, to: string): void {
+  for (const view of Object.values(state.pendingViews)) {
+    if (view.buildSessionId === from) view.buildSessionId = to
+  }
 }
+
 export async function discardPendingView(
   ws: WorkspaceEntry,
   id: string,
   activeSessionIds: Set<string>
 ) {
-  await update(ws.id, ws.path, async views => {
-    const index = views.findIndex(view => view.id === id)
-    if (index === -1) throw new PendingViewError('Pending view not found', 404)
-    const view = views[index]
-    if (
-      view.status === 'starting' ||
-      (view.executionSessionId && activeSessionIds.has(view.executionSessionId))
-    )
-      throw new PendingViewError('A starting or building view can only be closed', 409)
-    await archiveViewSessions(ws, id)
-    views.splice(index, 1)
+  const view = (await readWorkspaceState(ws)).pendingViews[id]
+  if (!view) throw new PendingViewError('Pending view not found', 404)
+  if (
+    view.status === 'starting' ||
+    (view.buildSessionId && activeSessionIds.has(view.buildSessionId))
+  )
+    throw new PendingViewError('A starting or building view can only be closed', 409)
+  // Archiving talks to the harness, so it runs before the state transaction.
+  await archiveViewSessions(ws, id)
+  await updateWorkspaceState(ws, state => {
+    delete state.pendingViews[id]
   })
 }

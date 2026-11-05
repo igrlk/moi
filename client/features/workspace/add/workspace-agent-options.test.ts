@@ -1,6 +1,10 @@
+import type { HarnessStatuses, WorkspaceType } from '@/lib/types'
 import { describe, expect, test } from 'bun:test'
 
-import { getWorkspaceAgentOptions, resolveWorkspaceAgentSelection } from './workspace-agent-options'
+import {
+  getWorkspaceAgentOptions as optionsFromStatuses,
+  resolveWorkspaceAgentSelection
+} from './workspace-agent-options'
 import type { HarnessInstallations } from '@/lib/types'
 
 describe('create workspace agent options', () => {
@@ -48,7 +52,7 @@ describe('create workspace agent options', () => {
       'Run in terminal to install ChatGPT:'
     ])
     expect(options.map(option => option.disabledCommand)).toEqual([
-      'curl -fsSL https://claude.ai/install.sh | sh',
+      'curl -fsSL https://claude.ai/install.sh | bash',
       'curl -fsSL https://chatgpt.com/codex/install.sh | sh'
     ])
   })
@@ -141,3 +145,22 @@ describe('import workspace agent options', () => {
     ).toBe('claude-code')
   })
 })
+
+function getWorkspaceAgentOptions(
+  installed?: HarnessInstallations,
+  detectedTypes: WorkspaceType[] = []
+) {
+  const statuses =
+    installed &&
+    (Object.fromEntries(
+      Object.entries(installed).map(([type, present]) => [
+        type,
+        {
+          availability: present
+            ? { status: 'available' }
+            : { status: 'unavailable', code: 'not-installed', reason: 'Not installed' }
+        }
+      ])
+    ) as HarnessStatuses | undefined)
+  return optionsFromStatuses(statuses, detectedTypes)
+}

@@ -1,15 +1,24 @@
+import { basename } from 'node:path'
+
 import type { WorkspaceSkillsStatus, WorkspaceSkillStatus, WorkspaceType } from '@/lib/types'
 
 import type { AppletDeclarationFile } from '../applets/declarations'
 import { syncAppletDeclarations } from '../applets/declarations'
-import { isBehind, skillStatuses } from './version'
-import { installBundledSkills } from './template'
-import { skillsDirFor } from '../workspaces/init'
+import { isBehind, skillStatuses, skillStatusesForLocations } from './version'
+import { installBundledSkill } from './template'
+import { resolveSkillLocations } from './locations'
+import {
+  installWorkspaceSkillFiles,
+  usesSharedWorkspaceSkill,
+  workspaceSkillLockPath
+} from './workspace'
+import { withSkillLock } from './lock'
 
 export type WorkspaceSkillUpdateResult = {
   before: WorkspaceSkillStatus[]
   status: WorkspaceSkillsStatus
   changedSkills: string[]
+  changedSkillPaths: string[]
   updatedAppletTypes: AppletDeclarationFile[]
 }
 
@@ -31,8 +40,45 @@ export async function updateWorkspaceSkills(
   workspaceRoot: string,
   type: WorkspaceType = 'claude-code'
 ): Promise<WorkspaceSkillUpdateResult> {
-  const before = await skillStatuses(workspaceRoot, type)
-  const changedSkills = await installBundledSkills(skillsDirFor(workspaceRoot, type))
+  return withSkillLock(workspaceSkillLockPath(workspaceRoot, type), () =>
+    updateWorkspaceSkillFiles(workspaceRoot, type)
+  )
+}
+
+async function updateWorkspaceSkillFiles(
+  workspaceRoot: string,
+  type: WorkspaceType
+): Promise<WorkspaceSkillUpdateResult> {
+  const locations = await resolveSkillLocations(workspaceRoot, type)
+  const before = await skillStatusesForLocations(locations)
+  let changedSkillPaths: string[]
+  if (usesSharedWorkspaceSkill(type)) {
+    changedSkillPaths = await installWorkspaceSkillFiles(workspaceRoot, type)
+  } else {
+    for (const location of locations) {
+      if (location.brokenLink) {
+        throw new Error(
+          `Cannot update skill at ${location.path}: broken symlink ${location.brokenLink}`
+        )
+      }
+    }
+    const changedTargets = new Map<string, boolean>()
+    for (const location of locations) {
+      if (changedTargets.has(location.targetPath)) continue
+      try {
+        changedTargets.set(
+          location.targetPath,
+          await installBundledSkill(location.name, location.targetPath)
+        )
+      } catch (cause) {
+        throw new Error(`Cannot update skill at ${location.path}: ${String(cause)}`, { cause })
+      }
+    }
+    changedSkillPaths = locations
+      .filter(location => changedTargets.get(location.targetPath))
+      .map(location => location.path)
+  }
+  const changedSkills = [...new Set(changedSkillPaths.map(path => basename(path)))]
   // Applet declarations ship with the CLI, so refresh installed copies along
   // with skills. The optional collab declaration is only updated if present.
   const updatedAppletTypes = await syncAppletDeclarations(workspaceRoot)
@@ -42,6 +88,7 @@ export async function updateWorkspaceSkills(
     before,
     status: summarizeSkillStatuses(skills),
     changedSkills,
+    changedSkillPaths,
     updatedAppletTypes
   }
 }

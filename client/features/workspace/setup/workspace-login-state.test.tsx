@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 import { renderToStaticMarkup } from 'react-dom/server'
 import * as config from '@/client/api/app-config'
-import type { HarnessAuth, LoginHarness } from '@/client/features/harness/api'
+import type { HarnessStatus, LoginHarness } from '@/client/features/harness/api'
 import { WorkspaceLoginState } from './workspace-login-state'
 
 let cfg: ReturnType<typeof spyOn<typeof config, 'useAppConfig'>>
@@ -17,17 +17,17 @@ afterEach(() => cfg.mockRestore())
 function render(
   type: LoginHarness,
   environment: 'local' | 'cloud',
-  data?: HarnessAuth,
+  data?: HarnessStatus,
   checking = false
 ) {
   cfg.mockReturnValue({
     environment,
     demo: false,
-    experimental: { collab: false },
+    collab: false,
     demoInstallUrl: ''
   })
   const client = new QueryClient()
-  if (data) client.setQueryData(['harness-auth', type], data)
+  if (data) client.setQueryData(['harness-status'], { [type]: data })
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <WorkspaceLoginState
@@ -73,8 +73,8 @@ test('local Codex uses a browser link without code instructions', () => {
   })
   expect(html).not.toContain('Cancel sign-in')
   expect(html).toContain('Open ChatGPT')
-  expect(html).toContain('Sign in to ChatGPT, then come back to Moi.')
-  expect(html).not.toContain('Having trouble signing in?')
+  expect(html).toContain('Log in in your browser, then come back to Moi')
+  expect(html).not.toContain('Having trouble logging in?')
   expect(html).not.toContain('ChatGPT security settings')
   expect(html).not.toContain('Authorization code')
 })
@@ -89,8 +89,8 @@ test('local Claude waits for the browser callback with the code fallback hidden'
       codeUrl: 'https://claude.com/oauth/manual'
     }
   })
-  expect(html).toContain('Your workspace will open once you’re connected.')
-  expect(html).toContain('Having trouble signing in?')
+  expect(html).toContain('Log in in your browser, then come back to Moi')
+  expect(html).toContain('Having trouble logging in?')
   expect(html).not.toContain('Authorization code')
   expect(html).toContain('Open Claude')
   expect(html).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A1234%2Fcallback')
@@ -110,12 +110,12 @@ test('cloud Claude asks for the full code from the sign-in page', () => {
   expect(html).toContain('Paste the code here:')
   expect(html).toContain('Authorization code')
   expect(html).toContain('Continue')
-  expect(html).not.toContain('Having trouble signing in?')
+  expect(html).not.toContain('Having trouble logging in?')
 })
 
 test('connected, failed, and loading states do not offer a misleading login', () => {
   const connected = render('codex', 'local', { availability: { status: 'available' } })
-  expect(connected).toContain('Signed in to ChatGPT, but this workspace still needs attention')
+  expect(connected).toContain('Logged in to ChatGPT, but this workspace still needs attention')
   expect(connected).toContain('Workspace credentials need attention')
   expect(connected).toContain('Try again')
   expect(connected).not.toContain('Continue')
@@ -126,10 +126,12 @@ test('connected, failed, and loading states do not offer a misleading login', ()
   const failed = render('codex', 'cloud', {
     availability: { status: 'unavailable', reason: 'Network failed' }
   })
-  expect(failed).toContain('Could not check agent sign-in status')
+  expect(failed).toContain('Couldn’t check whether you’re logged in')
   expect(failed).not.toContain('Continue')
   const loading = render('codex', 'local')
   expect(loading).not.toContain('Continue')
+  expect(loading).not.toContain('Set up')
+  expect(loading).not.toContain('<img')
   expect(loading).toContain('aria-label="Loading"')
 })
 
@@ -140,16 +142,16 @@ test('failed and expired login attempts still allow starting again', () => {
       login: { state: 'failed', reason }
     })
     expect(html).toContain(reason)
-    expect(html).toContain('Continue')
+    expect(html).toContain('Log in')
     expect(html).not.toContain('Cancel sign-in')
     expect(html).not.toContain('then come back to Moi')
     expect(html).not.toContain('target="_blank"')
   }
 })
 
-test('cloud Codex shows only Continue before a login attempt starts', () => {
+test('cloud Codex shows Log in before a login attempt starts', () => {
   const html = render('codex', 'cloud', { availability: signedOut })
-  expect(html).toContain('Continue')
+  expect(html).toContain('Log in')
   expect(html).not.toContain('Open settings')
   expect(html).not.toContain('device code sign-in')
   expect(html).not.toContain('Copy code')
@@ -162,7 +164,7 @@ test('starting login keeps the button until the browser link is ready', () => {
         availability: signedOut,
         login: { state: 'starting' }
       })
-      expect(html).toContain('Continue')
+      expect(html).toContain('Log in')
       expect(html).toContain('disabled')
       expect(html).not.toContain('then come back to Moi')
       expect(html).not.toContain('target="_blank"')
@@ -174,7 +176,7 @@ test('local Claude switches to manual code entry only through the trouble action
   cfg.mockReturnValue({
     environment: 'local',
     demo: false,
-    experimental: { collab: false },
+    collab: false,
     demoInstallUrl: ''
   })
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
@@ -190,7 +192,7 @@ test('local Claude switches to manual code entry only through the trouble action
   for (const [key, value] of Object.entries(globals))
     Object.defineProperty(globalThis, key, { configurable: true, value })
   const client = new QueryClient()
-  const auth: HarnessAuth = {
+  const auth: HarnessStatus = {
     availability: signedOut,
     login: {
       state: 'pending',
@@ -199,9 +201,11 @@ test('local Claude switches to manual code entry only through the trouble action
       codeUrl: 'https://example.com/manual'
     }
   }
-  client.setQueryData(['harness-auth', 'claude-code'], auth)
+  client.setQueryData(['harness-status'], { 'claude-code': auth })
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
-    Object.assign(async () => Response.json(auth), { preconnect: fetch.preconnect })
+    Object.assign(async () => Response.json({ 'claude-code': auth }), {
+      preconnect: fetch.preconnect
+    })
   )
   const root = createRoot(document.getElementById('root')!)
   try {
@@ -224,7 +228,7 @@ test('local Claude switches to manual code entry only through the trouble action
     })
     expect(document.querySelector('textarea')).toBeNull()
     const trouble = [...document.querySelectorAll('button')].find(
-      button => button.textContent === 'Having trouble signing in?'
+      button => button.textContent === 'Having trouble logging in?'
     )!
     await act(async () => {
       trouble.click()
@@ -243,4 +247,17 @@ test('local Claude switches to manual code entry only through the trouble action
       else Reflect.deleteProperty(globalThis, key)
     }
   }
+})
+
+test('missing local agents offer installation before login; cloud agents do not', () => {
+  const missing = {
+    availability: { status: 'unavailable', code: 'not-installed', reason: 'Missing' }
+  } as const
+  const local = render('codex', 'local', missing)
+  expect(local).toContain('isn’t installed on your computer yet')
+  expect(local).not.toContain('Couldn’t check whether you’re logged in')
+  expect(render('codex', 'cloud', missing)).not.toContain('isn’t installed on your computer yet')
+  expect(render('codex', 'local', { availability: signedOut })).not.toContain(
+    'isn’t installed on your computer yet'
+  )
 })

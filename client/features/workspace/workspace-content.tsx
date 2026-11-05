@@ -107,9 +107,11 @@ function tabItemFor(
         label: getViewLabel(view),
         closable: closable || view.status !== 'compiled',
         loading:
-          view.status !== 'compiled' &&
-          !!view.executionSessionId &&
-          viewRunning(view.executionSessionId)
+          view.status !== 'compiled' && !!view.buildSessionId && viewRunning(view.buildSessionId),
+        needsAttention:
+          view.status === 'failed' ||
+          (view.status === 'submitted' &&
+            (!view.buildSessionId || !viewRunning(view.buildSessionId)))
       }
     : null
 }
@@ -207,8 +209,8 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
     !pinnedSessionId &&
     sessionId === null &&
     activePendingView?.status === 'draft' &&
-    (!activePendingView.executionSessionId ||
-      !isSessionRunning(sessionActivity, workspaceId, activePendingView.executionSessionId))
+    (!activePendingView.buildSessionId ||
+      !isSessionRunning(sessionActivity, workspaceId, activePendingView.buildSessionId))
       ? activePendingView
       : undefined
   const activeDraftViewId = activeDraftView?.id
@@ -460,7 +462,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
                 setWidgetMode(customizing ? 'customizing' : 'idle')
               }
               widgets={widgets}
-              views={views}
+              views={allViews}
               onOpenView={viewId => openTab(viewTabId(viewId))}
               onCreateView={createView}
               onCreateWidget={() => {
@@ -484,8 +486,8 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
               active={!isUnavailable && activePendingView?.id === pendingView.id}
               pendingView={pendingView}
               running={
-                !!pendingView.executionSessionId &&
-                isSessionRunning(sessionActivity, workspaceId, pendingView.executionSessionId)
+                !!pendingView.buildSessionId &&
+                isSessionRunning(sessionActivity, workspaceId, pendingView.buildSessionId)
               }
               sketchSessionId={
                 pendingView.status === 'draft'
@@ -493,6 +495,7 @@ export function WorkspaceContent({ widgets, views: allViews }: WorkspaceContentP
                   : undefined
               }
               chatDocked={mode === 'split'}
+              chatOpen={mode === 'split' || floatingChatOpen}
               workspaceId={workspaceId}
               onEditingStart={() => {
                 if (mode === 'fullscreen') setFloatingChatOpen(false)

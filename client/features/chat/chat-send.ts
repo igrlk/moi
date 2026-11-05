@@ -1,3 +1,4 @@
+import type { SpeedMode } from '@/lib/types'
 import type {
   AttachmentInput,
   AttachmentOrigin,
@@ -12,16 +13,17 @@ import { composerDraftKey } from '@/lib/session-drafts'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
+import { changeWorkspaceStateCache } from '@/client/features/workspace/workspace-state'
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import { useUiStore } from '@/client/store/ui'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
-import { resolveSelectedModel } from '@/client/features/chat/composer/model-order'
+import { resolveSpeedMode, resolveSelectedModel } from '@/client/features/chat/composer/model-order'
 import type { MoiUserMessageOptions } from '@/client/features/workspace/moi-context'
 import { STREAM_RESPONSES } from '@/client/lib/flags'
 import { formatChatTitle } from '@/lib/chat-title'
 import { applyEvent, emptyViewState } from '@/lib/format'
 import { messageAttachmentLimitError } from '@/lib/message-attachments'
-import type { Part, SessionInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import type { Part, SessionSummary, ViewState, WorkspaceHarness, WorkspaceTabId } from '@/lib/types'
 
 // Explicit attachments belong to this send, independently of the user's draft.
 export type PreparedAttachments = {
@@ -163,7 +165,7 @@ export function startOptimisticTurn({
 }
 
 type StartOptimisticSessionInput = {
-  tabId?: SessionInfo['tabId']
+  tabId?: WorkspaceTabId
   queryClient: QueryClient
   workspaceId: string
   sessionId: string
@@ -179,20 +181,25 @@ export function startOptimisticSession({
   text,
   filenames = []
 }: StartOptimisticSessionInput): void {
+  // File the chat under its tab now; the server confirms it with the send.
+  if (tabId && tabId !== 'overview')
+    changeWorkspaceStateCache(queryClient, workspaceId, draft => {
+      draft.sessions[sessionId] = { ...draft.sessions[sessionId], tabId }
+    })
   const summary = formatChatTitle(text, filenames)
   if (!summary) return
-  queryClient.setQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId), current => [
-    { sessionId, summary, lastModified: Date.now(), ...(tabId ? { tabId } : {}) },
+  queryClient.setQueryData<SessionSummary[]>(workspaceKeys.sessions(workspaceId), current => [
+    { sessionId, summary, lastModified: Date.now() },
     ...(current ?? []).filter(session => session.sessionId !== sessionId)
   ])
 }
 
 export function resolveChatRunOptions(
-  modelsData: WorkspaceAgent | undefined,
+  modelsData: WorkspaceHarness | undefined,
   pickedModel: string | undefined,
   pickedEffort: string | undefined,
-  pickedFastMode?: boolean
-): { model?: string; effort?: string; fastMode?: boolean; stream?: true } {
+  pickedSpeedMode?: SpeedMode
+): { model?: string; effort?: string; speedMode?: SpeedMode; stream?: true } {
   const models = modelsData?.models
   const savedModel =
     !pickedModel || !models || models.some(candidate => candidate.value === pickedModel)
@@ -213,15 +220,12 @@ export function resolveChatRunOptions(
     pickedEffort && (!modelInfo || (modelInfo.supportedEffortLevels ?? []).includes(pickedEffort))
       ? pickedEffort
       : undefined
-  const fastMode =
-    pickedFastMode === undefined || !modelInfo || modelInfo.supportsFastMode
-      ? pickedFastMode
-      : false
+  const speedMode = modelInfo ? resolveSpeedMode(modelInfo, pickedSpeedMode) : pickedSpeedMode
   const stream = STREAM_RESPONSES && modelsData?.supportsStreaming ? true : undefined
   return {
     model,
     effort,
-    ...(fastMode !== undefined ? { fastMode } : {}),
+    ...(speedMode !== undefined ? { speedMode } : {}),
     stream
   }
 }

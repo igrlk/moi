@@ -15,7 +15,13 @@ import {
 import { attachmentKey, liveStore } from '@/client/features/chat/chat-store'
 import type { StagedAttachment } from '@/client/features/chat/composer/attachments/types'
 import { MAX_MESSAGE_ATTACHMENTS } from '@/lib/message-attachments'
-import type { SessionInfo, UploadInfo, ViewState, WorkspaceAgent } from '@/lib/types'
+import type {
+  SessionSummary,
+  UploadInfo,
+  ViewState,
+  WorkspaceHarness,
+  WorkspaceState
+} from '@/lib/types'
 import { resolveSelectedModel } from './composer/model-order'
 
 const workspaceId = 'workspace-1'
@@ -67,13 +73,45 @@ describe('startOptimisticSession', () => {
     })
 
     expect(
-      queryClient.getQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId))
+      queryClient.getQueryData<SessionSummary[]>(workspaceKeys.sessions(workspaceId))
     ).toMatchObject([
       {
         sessionId,
         summary: 'Build a customer dashboard with useful charts'
       }
     ])
+  })
+
+  test('files a view chat under its tab before the server confirms it', () => {
+    const queryClient = new QueryClient()
+    const state: WorkspaceState = { revision: 3, selected: {}, sessions: {}, pendingViews: {} }
+    queryClient.setQueryData(workspaceKeys.state(workspaceId), state)
+    startOptimisticSession({
+      tabId: 'views/notes',
+      queryClient,
+      workspaceId,
+      sessionId,
+      text: 'hello'
+    })
+
+    expect(
+      queryClient.getQueryData<WorkspaceState>(workspaceKeys.state(workspaceId))?.sessions
+    ).toEqual({ [sessionId]: { tabId: 'views/notes' } })
+  })
+
+  test('leaves an overview chat out of the workspace state', () => {
+    const queryClient = new QueryClient()
+    const state: WorkspaceState = { revision: 3, selected: {}, sessions: {}, pendingViews: {} }
+    queryClient.setQueryData(workspaceKeys.state(workspaceId), state)
+    startOptimisticSession({
+      tabId: 'overview',
+      queryClient,
+      workspaceId,
+      sessionId,
+      text: 'hello'
+    })
+
+    expect(queryClient.getQueryData<WorkspaceState>(workspaceKeys.state(workspaceId))).toBe(state)
   })
 
   test('uses filenames for an attachment-only chat', () => {
@@ -87,13 +125,13 @@ describe('startOptimisticSession', () => {
     })
 
     expect(
-      queryClient.getQueryData<SessionInfo[]>(workspaceKeys.sessions(workspaceId))?.[0]?.summary
+      queryClient.getQueryData<SessionSummary[]>(workspaceKeys.sessions(workspaceId))?.[0]?.summary
     ).toBe('brief.pdf')
   })
 })
 
 describe('resolveChatRunOptions', () => {
-  const models: WorkspaceAgent = {
+  const models: WorkspaceHarness = {
     provider: 'claude-code',
     availability: { status: 'available' },
     supportsStreaming: true,
@@ -116,6 +154,7 @@ describe('resolveChatRunOptions', () => {
     expect(resolveChatRunOptions(models, 'sonnet', 'high')).toEqual({
       model: 'sonnet',
       effort: 'high',
+      speedMode: 'normal',
       stream: true
     })
   })
@@ -124,6 +163,7 @@ describe('resolveChatRunOptions', () => {
     expect(resolveChatRunOptions(models, 'sonnet', undefined)).toEqual({
       model: 'sonnet',
       effort: undefined,
+      speedMode: 'normal',
       stream: true
     })
   })
@@ -140,50 +180,51 @@ describe('resolveChatRunOptions', () => {
     expect(resolveChatRunOptions(models, 'sonnet', 'medium')).toEqual({
       model: 'sonnet',
       effort: undefined,
+      speedMode: 'normal',
       stream: true
     })
   })
 
   test('keeps enabled and explicitly disabled Fast mode for a supported model', () => {
-    expect(resolveChatRunOptions(models, 'sonnet', 'high', true)).toEqual({
+    expect(resolveChatRunOptions(models, 'sonnet', 'high', 'fast')).toEqual({
       model: 'sonnet',
       effort: 'high',
-      fastMode: true,
+      speedMode: 'fast',
       stream: true
     })
-    expect(resolveChatRunOptions(models, 'sonnet', 'high', false)).toEqual({
+    expect(resolveChatRunOptions(models, 'sonnet', 'high', 'normal')).toEqual({
       model: 'sonnet',
       effort: 'high',
-      fastMode: false,
+      speedMode: 'normal',
       stream: true
     })
   })
 
   test('disables Fast mode for a known unsupported model without dropping the preference', () => {
-    expect(resolveChatRunOptions(models, 'haiku', 'high', true)).toEqual({
+    expect(resolveChatRunOptions(models, 'haiku', 'high', 'fast')).toEqual({
       model: 'haiku',
       effort: 'high',
-      fastMode: false,
+      speedMode: 'normal',
       stream: true
     })
   })
 
   test('keeps Fast mode for a stale model that the client cannot validate', () => {
-    expect(resolveChatRunOptions(models, 'removed-model', 'high', true)).toEqual({
+    expect(resolveChatRunOptions(models, 'removed-model', 'high', 'fast')).toEqual({
       model: undefined,
       effort: 'high',
-      fastMode: true,
+      speedMode: 'fast',
       stream: true
     })
   })
 
-  test('omits Fast mode when no moi preference exists', () => {
-    expect(resolveChatRunOptions(models, 'sonnet', 'high')).not.toHaveProperty('fastMode')
+  test('uses normal when no Moi preference exists', () => {
+    expect(resolveChatRunOptions(models, 'sonnet', 'high')).toHaveProperty('speedMode', 'normal')
   })
 })
 
 describe('Codex model selection', () => {
-  const catalog: WorkspaceAgent = {
+  const catalog: WorkspaceHarness = {
     provider: 'codex',
     availability: { status: 'available' },
     models: [
@@ -199,20 +240,45 @@ describe('Codex model selection', () => {
     ]
   }
 
+  test('sends Ultrafast only to a model that advertises it', () => {
+    const data = {
+      ...catalog,
+      models: catalog.models.map(model => ({ ...model, supportsUltrafastMode: true }))
+    }
+    expect(resolveChatRunOptions(data, 'gpt-5.6-sol', 'low', 'ultrafast').speedMode).toBe(
+      'ultrafast'
+    )
+    expect(resolveChatRunOptions(catalog, 'gpt-5.6-sol', 'low', 'ultrafast').speedMode).toBe('fast')
+    expect(resolveChatRunOptions(catalog, 'gpt-5.6-luna', 'low', 'ultrafast').speedMode).toBe(
+      'normal'
+    )
+  })
+
+  test('sends the displayed Codex default and clears inherited tiers on unsupported models', () => {
+    const data = {
+      ...catalog,
+      models: catalog.models.map(model =>
+        model.value === 'gpt-5.6-sol' ? { ...model, supportsUltrafastMode: true } : model
+      )
+    }
+    expect(resolveChatRunOptions(data, 'gpt-5.6-sol', 'low').speedMode).toBe('normal')
+    expect(resolveChatRunOptions(data, 'gpt-5.6-luna', 'low').speedMode).toBe('normal')
+  })
+
   for (const pick of [undefined, 'default', 'gpt-6-astra', 'gpt-5.6-sol']) {
     test(`sends the displayed Sol model for ${pick ?? 'an implicit default'}`, () => {
       const displayed = resolveSelectedModel(catalog.models, pick)
-      const run = resolveChatRunOptions(catalog, pick, 'xhigh', true)
+      const run = resolveChatRunOptions(catalog, pick, 'xhigh', 'fast')
       expect(displayed?.displayName).toBe('5.6 Sol')
-      expect(run).toMatchObject({ model: displayed?.value, effort: 'xhigh', fastMode: true })
+      expect(run).toMatchObject({ model: displayed?.value, effort: 'xhigh', speedMode: 'fast' })
     })
   }
 
   test('an explicit choice overrides the configured default and validates its capabilities', () => {
-    expect(resolveChatRunOptions(catalog, 'gpt-5.6-luna', 'xhigh', true)).toMatchObject({
+    expect(resolveChatRunOptions(catalog, 'gpt-5.6-luna', 'xhigh', 'fast')).toMatchObject({
       model: 'gpt-5.6-luna',
       effort: undefined,
-      fastMode: false
+      speedMode: 'normal'
     })
   })
 

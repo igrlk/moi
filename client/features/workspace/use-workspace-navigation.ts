@@ -13,6 +13,7 @@ import { resolveActiveTab, tabAvailable } from './tab-resolution'
 import { useWorkspaceLayoutCtx } from './workspace-layout-context'
 import { useNavigationClient } from '@/client/runtime/use-workspace-events'
 import { useSelectLinkedChat } from '@/client/features/chat/sessions/api'
+import { getCachedViews } from '@/client/features/views/api'
 import type { ViewInfo, WorkspaceTabId, WorkspaceTabsState } from '@/lib/types'
 import { resolveUrl } from '@/lib/navigation'
 import { isWorkspaceTabId, tabFromPath } from '@/lib/workspace-tabs'
@@ -119,26 +120,31 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
         const targetPath = target.slice(prefix.length).split('?', 1)[0]
         if (targetPath === 'chat' || targetPath.startsWith('chats/')) {
           const { tab, href } = currentPage()
-          const shouldOpenChat =
+          const destination =
             targetPath === 'chat'
-              ? true
+              ? tab
               : await selectLinkedChat(
                   decodeURIComponent(targetPath.slice('chats/'.length)),
                   tab,
                   controller.signal
                 )
-          commit(resolveUrl(href, { workspaceId, base }))
-          if (shouldOpenChat) latest.current.onOpenChat()
+          const destinationHref =
+            destination && destination !== tab ? tabUrl(remembered, destination) : href
+          commit(resolveUrl(destinationHref, { workspaceId, base }))
+          if (destination) latest.current.onOpenChat()
           return
         }
 
         if (!isWorkspaceTabId(targetPath))
           throw new Error('This destination is unavailable in this workspace')
-        const queryKey = workspaceKeys.views(workspaceId)
-        let availableViews = queryClient.getQueryData<ViewInfo[]>(queryKey) ?? latest.current.views
+        let availableViews = getCachedViews(queryClient, workspaceId) ?? latest.current.views
         if (!tabAvailable(targetPath, availableViews)) {
-          await queryClient.refetchQueries({ queryKey, exact: true }, { throwOnError: true })
-          availableViews = queryClient.getQueryData<ViewInfo[]>(queryKey) ?? latest.current.views
+          await Promise.all(
+            [workspaceKeys.views(workspaceId), workspaceKeys.state(workspaceId)].map(queryKey =>
+              queryClient.refetchQueries({ queryKey, exact: true }, { throwOnError: true })
+            )
+          )
+          availableViews = getCachedViews(queryClient, workspaceId) ?? latest.current.views
         }
         if (!tabAvailable(targetPath, availableViews))
           throw new Error('This destination is unavailable in this workspace')
@@ -147,7 +153,17 @@ export function useWorkspaceNavigation({ views, onOpenChat }: UseWorkspaceNaviga
         if (navigationRequest.current?.controller === controller) navigationRequest.current = null
       }
     },
-    [base, currentPage, latest, prefix, queryClient, selectLinkedChat, setLocation, workspaceId]
+    [
+      base,
+      currentPage,
+      latest,
+      prefix,
+      queryClient,
+      remembered,
+      selectLinkedChat,
+      setLocation,
+      workspaceId
+    ]
   )
 
   useEffect(() => {

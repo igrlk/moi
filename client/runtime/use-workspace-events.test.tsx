@@ -1,12 +1,23 @@
 import { afterEach, expect, test } from 'bun:test'
-import { act } from 'react'
+import { act, useState, type ReactNode } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRoot } from 'react-dom/client'
 import { parseHTML } from 'linkedom'
 
-import { AppProvider } from '@/client/app/app-provider'
+import { AppProvider as EventsProvider } from '@/client/app/app-provider'
 
 import { useWorkspaceEvent } from './use-workspace-events'
 import { WorkspaceEventsClient } from './workspace-events'
+
+type AppProviderProps = { children: ReactNode }
+function AppProvider({ children }: AppProviderProps) {
+  const [client] = useState(() => new QueryClient())
+  return (
+    <QueryClientProvider client={client}>
+      <EventsProvider>{children}</EventsProvider>
+    </QueryClientProvider>
+  )
+}
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
@@ -143,6 +154,6 @@ test('a dropped socket reopens on its own and delivers events again', async () =
   expect(FakeWebSocket.instances.length).toBe(2)
   FakeWebSocket.instances[1]!.open()
   FakeWebSocket.instances[1]!.onmessage?.({ data: JSON.stringify({ type: 'theme:updated' }) })
-  expect(received).toEqual(['theme:updated'])
+  expect(received).toEqual(['connection:opened', 'connection:opened', 'theme:updated'])
   client.close()
 })

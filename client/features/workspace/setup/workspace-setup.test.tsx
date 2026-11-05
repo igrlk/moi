@@ -8,13 +8,16 @@ import { parseHTML } from 'linkedom'
 import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import * as config from '@/client/api/app-config'
+import { SidebarLayout } from '@/client/app/shell/sidebar-layout'
+import { AccountProvider } from '@/client/features/account/account-provider'
 import { workspaceKeys } from '@/client/api/workspace-keys'
 import * as events from '@/client/runtime/use-workspace-events'
-import type { WorkspaceAgent, HarnessAvailability } from '@/lib/types'
+import type { WorkspaceHarness, HarnessAvailability } from '@/lib/types'
 import { createUiStore } from '@/client/store/ui'
 import { attachmentKey, liveStore, useLive } from '@/client/features/chat/chat-store'
 import { WorkspaceScreen } from '../workspace-screen'
 import * as workspaceContent from '../workspace-content'
+import * as workspaceFrame from '../workspace-frame'
 import { WorkspaceLayoutContext } from '../workspace-layout-context'
 import { createDefaultWorkspaceLayout } from '@/lib/workspace-layout'
 import { welcomeNewWorkspace } from './workspace-welcome-state'
@@ -50,7 +53,8 @@ async function mount(
   demo = false,
   globalConnected = false,
   contentPending = false,
-  check?: Promise<HarnessAvailability>
+  check?: Promise<HarnessAvailability>,
+  environment: 'local' | 'cloud' = 'cloud'
 ) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>')
   const globals = {
@@ -67,9 +71,9 @@ async function mount(
     Object.defineProperty(globalThis, key, { configurable: true, value })
   notifyManager.setNotifyFunction(callback => act(callback))
   const configSpy = spyOn(config, 'useAppConfig').mockReturnValue({
-    environment: 'cloud',
+    environment,
     demo,
-    experimental: { collab: false },
+    collab: false,
     demoInstallUrl: ''
   })
   const destinations: string[] = []
@@ -81,8 +85,8 @@ async function mount(
   ])
   const eventsSpy = spyOn(events, 'useWorkspaceEvent').mockImplementation(() => {})
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const key = workspaceKeys.agent('test')
-  let data: WorkspaceAgent = {
+  const key = workspaceKeys.harness('test')
+  let data: WorkspaceHarness = {
     provider: 'codex',
     availability: status,
     models: [],
@@ -91,12 +95,8 @@ async function mount(
   }
   let fail = false
   client.setQueryData(key, data)
-  const globalAuth = {
-    availability: globalConnected
-      ? { status: 'available' }
-      : { status: 'login-required', reason: 'Sign in' }
-  }
-  client.setQueryData(['harness-auth', 'codex'], globalAuth)
+  let globalAuth = { availability: globalConnected ? { status: 'available' as const } : status }
+  if (!check) client.setQueryData(['harness-status'], { codex: globalAuth })
   const requests: string[] = []
   const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
@@ -106,11 +106,14 @@ async function mount(
         if (path === '/api/workspaces/test' && init?.method === 'DELETE') {
           return new Response(null, { status: 204 })
         }
-        if (path.startsWith('/api/workspaces/test/agent')) {
+        if (path.startsWith('/api/workspaces/test/harness')) {
           if (fail) throw new Error('Offline')
           return Response.json(check ? { ...data, availability: await check } : data)
         }
-        if (path === '/api/harnesses/codex/auth') return Response.json(globalAuth)
+        if (path.startsWith('/api/harnesses/status')) {
+          if (fail) throw new Error('Offline')
+          return Response.json({ codex: check ? { availability: await check } : globalAuth })
+        }
         throw new Error(`Unexpected request: ${path}`)
       },
       { preconnect: fetch.preconnect }
@@ -165,6 +168,7 @@ async function mount(
     )
   }
   const contentSpy = spyOn(workspaceContent, 'WorkspaceContent').mockImplementation(Content)
+  const frameSpy = spyOn(workspaceFrame, 'WorkspaceFrame')
   const root = createRoot(document.getElementById('root')!)
   cleanup = async () => {
     await act(async () => {
@@ -174,6 +178,7 @@ async function mount(
     })
     liveStore.setState({ attachments: originalAttachments })
     contentSpy.mockRestore()
+    frameSpy.mockRestore()
     fetchSpy.mockRestore()
     configSpy.mockRestore()
     locationSpy.mockRestore()
@@ -201,6 +206,9 @@ async function mount(
   const update = async (availability: HarnessAvailability) => {
     data = { ...data, availability }
     await act(async () => {
+      globalAuth = { availability }
+      await client.cancelQueries({ queryKey: ['harness-status'] })
+      client.setQueryData(['harness-status'], { codex: globalAuth })
       client.setQueryData(key, data)
       await Bun.sleep(20)
     })
@@ -227,6 +235,7 @@ async function mount(
     configSpy,
     document,
     contentSpy,
+    frameSpy,
     update,
     click,
     requests,
@@ -242,9 +251,10 @@ async function mount(
 }
 
 test('signed-out workspace shows only its own login and no workspace content', async () => {
-  const { document, contentSpy } = await mount()
+  const { document, contentSpy, frameSpy } = await mount()
   expect(contentSpy).not.toHaveBeenCalled()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(frameSpy).not.toHaveBeenCalled()
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(
     document.querySelector('[data-slot="workspace-pane"] [aria-label="Workspace setup"]')
   ).not.toBeNull()
@@ -261,10 +271,15 @@ test('fresh readiness from home opens the workspace without another request', as
 })
 
 test('one loading state waits for workspace content after readiness succeeds', async () => {
-  const { document, setContentPending } = await mount({ status: 'available' }, false, false, true)
-  expect(
-    document.querySelector('[data-slot="workspace-pane"] [aria-label="Loading"]')
-  ).not.toBeNull()
+  const { document, setContentPending, frameSpy } = await mount(
+    { status: 'available' },
+    false,
+    false,
+    true
+  )
+  expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
+  expect(document.querySelector('[data-slot="workspace-pane"]')).toBeNull()
+  expect(frameSpy).not.toHaveBeenCalled()
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
   expect(document.querySelector('[data-content]')).toBeNull()
   await setContentPending(false)
@@ -274,7 +289,7 @@ test('one loading state waits for workspace content after readiness succeeds', a
 
 test('login can resolve without waiting for workspace content', async () => {
   const { document } = await mount(undefined, false, false, true)
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
 })
 
@@ -283,7 +298,7 @@ test('a cold entry shows only a loading spinner until readiness is known', async
   configSpy.mockReturnValue({
     environment: 'local',
     demo: false,
-    experimental: { collab: false },
+    collab: false,
     demoInstallUrl: ''
   })
   const client = new QueryClient()
@@ -293,12 +308,47 @@ test('a cold entry shows only a loading spinner until readiness is known', async
     </QueryClientProvider>
   )
   client.clear()
-  expect(html).toContain('data-slot="workspace-pane"')
+  expect(html).not.toContain('data-slot="workspace-pane"')
   expect(html).toContain('aria-label="Loading"')
   expect(html).not.toContain('aria-label="Workspace setup"')
   expect(html).not.toContain('Checking your agent')
   expect(html).not.toContain('<h1')
   expect(html).not.toContain('Workspace content')
+})
+
+test('the app sidebar renders known workspaces while the workspace area waits for readiness', async () => {
+  await mount(undefined, true)
+  const client = new QueryClient()
+  client.setQueryData(workspaceKeys.all, [
+    {
+      id: 'cold',
+      name: 'My workspace',
+      path: '/tmp/cold',
+      type: 'codex',
+      addedAt: '2026-01-01T00:00:00Z'
+    }
+  ])
+  try {
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <router.Router ssrPath="/workspace/cold">
+          <AccountProvider>
+            <SidebarLayout>
+              <ScreenFixture workspaceId="cold" contentPending />
+            </SidebarLayout>
+          </AccountProvider>
+        </router.Router>
+      </QueryClientProvider>
+    )
+    const { document } = parseHTML(`<html><body>${html}</body></html>`)
+    expect(document.querySelector('aside a[aria-label="Home"]')).not.toBeNull()
+    expect(document.querySelector('aside a[href="/workspace/cold"]')).not.toBeNull()
+    expect(document.querySelector('main [aria-label="Loading"]')).not.toBeNull()
+    expect(document.querySelector('main [data-slot="workspace-pane"]')).toBeNull()
+    expect(document.querySelector('main [aria-label="Workspace setup"]')).toBeNull()
+  } finally {
+    client.clear()
+  }
 })
 
 test('expiry unmounts content and portals, then restores stored drafts and attachments', async () => {
@@ -311,7 +361,7 @@ test('expiry unmounts content and portals, then restores stored drafts and attac
   await update({ status: 'login-required', reason: 'Expired' })
   expect(document.querySelector('[data-content]')).toBeNull()
   expect(document.querySelector('#floating-chat')).toBeNull()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   await update({ status: 'available' })
   expect(document.querySelector('[data-content]')).not.toBeNull()
   expect(document.querySelector('[data-content]')).not.toBe(previousContent)
@@ -327,55 +377,32 @@ test('unavailable and failed status checks show recovery and retry a fresh check
     reason: 'Install Codex in your terminal'
   })
   expect(document.body.textContent).toContain('Install Codex in your terminal')
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
   setFail(true)
   await click('Try again')
   expect(document.body.textContent).toContain('Could not check your agent')
   setFail(false)
   await click('Try again')
   expect(document.body.textContent).toContain('Install Codex in your terminal')
-  expect(requests.filter(path => path.endsWith('/agent?refresh=true')).length).toBe(3)
+  expect(requests.filter(path => path.includes('/status?refresh=true')).length).toBe(2)
 })
 
-test('global login success rechecks workspace readiness instead of unlocking it', async () => {
-  const { document, requests } = await mount(
-    { status: 'login-required', reason: 'Workspace credentials need attention' },
-    false,
-    true
-  )
-  expect(document.body.textContent).toContain(
-    'Signed in to ChatGPT, but this workspace still needs attention'
-  )
-  expect(document.querySelector('[data-content]')).toBeNull()
-  expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
+test('global login success unlocks workspaces without another workspace auth check', async () => {
+  const { document, requests } = await mount(undefined, false, true)
+  expect(document.querySelector('[data-content]')).not.toBeNull()
+  expect(requests).toEqual([])
 })
 
-test('demo uses the same login recovery and readiness checks', async () => {
+test('demo reuses cached sign-out without repeating checks', async () => {
   const { document, requests } = await mount(undefined, true)
-  expect(document.querySelector('[data-content]')).toBeNull()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
-  expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
-})
-
-test('a working agent is reconfirmed from the server cache, a failed one re-probed', async () => {
-  const ready = await mount({ status: 'available' })
-  // A fresh snapshot is reused as is; a refetch of a working agent asks the
-  // server's cached answer, never the slow re-probe.
-  expect(ready.requests.filter(path => path.includes('/agent'))).toEqual([])
-  await act(async () => {
-    await ready.client.invalidateQueries({ queryKey: workspaceKeys.agent('test') })
-  })
-  expect(ready.requests).toContain('/api/workspaces/test/agent')
-  expect(ready.requests).not.toContain('/api/workspaces/test/agent?refresh=true')
-  await cleanup()
-  const failed = await mount({ status: 'login-required', reason: 'Sign in' })
-  expect(failed.requests).toContain('/api/workspaces/test/agent?refresh=true')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
+  expect(requests).toEqual([])
 })
 
 test('a ready demo opens the workspace normally', async () => {
   const { document } = await mount({ status: 'available' }, true)
   expect(document.querySelector('[data-content]')).not.toBeNull()
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
 })
 
 test('missing folder offers deletion and returns home after removing the workspace', async () => {
@@ -384,9 +411,9 @@ test('missing folder offers deletion and returns home after removing the workspa
     reason: 'Workspace folder not found'
   })
   await act(async () => {
-    client.setQueryData<WorkspaceAgent>(key, previous => ({
+    client.setQueryData<WorkspaceHarness>(key, previous => ({
       ...previous!,
-      workspaceFolderMissing: true
+      isFolderMissing: true
     }))
     await Bun.sleep(20)
   })
@@ -406,7 +433,7 @@ test('cached sign-out waits for verification without briefly showing login', asy
   const { document } = await mount(undefined, false, false, false, check.promise)
   expect(document.querySelector('[aria-label="Loading"]')).not.toBeNull()
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
   await act(async () => {
     check.resolve({ status: 'available' })
     await Bun.sleep(20)
@@ -417,31 +444,33 @@ test('cached sign-out waits for verification without briefly showing login', asy
 
 test('confirmed sign-out shows login and keeps it visible while retrying', async () => {
   const check = Promise.withResolvers<HarnessAvailability>()
-  const { document, client, key, setCheck } = await mount(
+  const { document, client, setCheck, frameSpy } = await mount(
     undefined,
     false,
     false,
     false,
     check.promise
   )
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
-  const pane = document.querySelector('[data-slot="workspace-pane"]')
-  expect(pane).not.toBeNull()
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
+  expect(document.querySelector('[data-slot="workspace-pane"]')).toBeNull()
+  expect(frameSpy).not.toHaveBeenCalled()
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
   await act(async () => {
     check.resolve({ status: 'login-required', reason: 'Signed out' })
     await Bun.sleep(20)
   })
-  expect(document.querySelector('[data-slot="workspace-pane"]')).toBe(pane)
+  const pane = document.querySelector('[data-slot="workspace-pane"]')
+  expect(pane).not.toBeNull()
+  expect(frameSpy).not.toHaveBeenCalled()
   expect(pane?.querySelector('[aria-label="Workspace setup"]')).not.toBeNull()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   const retry = Promise.withResolvers<HarnessAvailability>()
   setCheck(retry.promise)
   await act(async () => {
-    void client.refetchQueries({ queryKey: key })
+    void client.refetchQueries({ queryKey: ['harness-status'] })
     await Bun.sleep(20)
   })
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(document.querySelector('[aria-label="Loading"]')).toBeNull()
   await act(async () => {
     retry.resolve({ status: 'login-required', reason: 'Still signed out' })
@@ -455,7 +484,7 @@ test('background checks and network failures preserve a ready workspace', async 
   const check = Promise.withResolvers<HarnessAvailability>()
   setCheck(check.promise)
   await act(async () => {
-    void client.refetchQueries({ queryKey: key })
+    void client.refetchQueries({ queryKey: ['harness-status'] })
     await Bun.sleep(20)
   })
   expect(document.querySelector('[aria-label="Workspace setup"]')).toBeNull()
@@ -520,10 +549,10 @@ test('welcome precedes login and chat stays hidden until login is verified', asy
   welcomeNewWorkspace('test')
   const { document, update, requests } = await mount()
   expect(document.querySelector('[aria-label="Workspace welcome"]')).not.toBeNull()
-  expect(document.body.textContent).not.toContain('Log in to ChatGPT')
-  expect(requests).toContain('/api/workspaces/test/agent?refresh=true')
+  expect(document.body.textContent).not.toContain('Set up ChatGPT')
+  expect(requests).toEqual([])
   await finishWelcome()
-  expect(document.body.textContent).toContain('Log in to ChatGPT')
+  expect(document.body.textContent).toContain('Set up ChatGPT')
   expect(chatHidden(document)).toBe(true)
   await update({ status: 'available' })
   expect(document.querySelector('[data-content]')).not.toBeNull()
@@ -589,4 +618,19 @@ test('unavailable agent replaces welcome and keeps chat hidden', async () => {
   expect(document.body.textContent).toContain('Agent is missing')
   expect(chatHidden(document)).toBe(true)
   expect(document.querySelector('[data-content]')).toBeNull()
+})
+
+test('missing local agents reuse install while cloud keeps manual recovery', async () => {
+  const missing = {
+    status: 'unavailable',
+    code: 'not-installed',
+    reason: 'Install instructions'
+  } as const
+  const local = await mount(missing, false, false, false, undefined, 'local')
+  expect(local.document.body.textContent).toContain('Install ChatGPT')
+  expect(local.document.body.textContent).not.toContain('Check again')
+  await cleanup()
+  const cloud = await mount(missing)
+  expect(cloud.document.body.textContent).toContain('Install instructions')
+  expect(cloud.document.body.textContent).not.toContain('Install ChatGPT')
 })

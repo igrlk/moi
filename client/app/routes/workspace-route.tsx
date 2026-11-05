@@ -1,3 +1,4 @@
+import { useWorkspaceHarnessChanges } from '@/client/features/workspace/harness-transition'
 import { useWorkspaceTheme } from '@/client/runtime/workspace-theme'
 import { CollabProvider, useCollabEnabled } from '@/client/features/collab'
 import { useQueryClient } from '@tanstack/react-query'
@@ -25,16 +26,18 @@ type WorkspaceRouteProps = {
 // Navigation reads the raw browser address so encoded paths and query params
 // are decoded exactly once; the route only owns the workspace ID.
 export function WorkspaceRoute({ id }: WorkspaceRouteProps) {
-  const { experimental } = useAppConfig()
+  const { collab } = useAppConfig()
 
   return (
-    <Workspace id={id}>
-      <WorkspaceLayoutProvider id={id}>
-        <CollabProvider workspaceId={id} enabled={experimental.collab}>
-          <WorkspaceContent id={id} />
-        </CollabProvider>
-      </WorkspaceLayoutProvider>
-    </Workspace>
+    <SidebarLayout>
+      <Workspace id={id}>
+        <WorkspaceLayoutProvider id={id}>
+          <CollabProvider workspaceId={id} enabled={collab}>
+            <WorkspaceContent id={id} />
+          </CollabProvider>
+        </WorkspaceLayoutProvider>
+      </Workspace>
+    </SidebarLayout>
   )
 }
 
@@ -42,7 +45,8 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
   const collabEnabled = useCollabEnabled()
   const queryClient = useQueryClient()
   const [selectedSessionId] = useSelectedSession()
-  const { isLoading: layoutLoading, layout } = useWorkspaceLayoutCtx()
+  const { isLoading: layoutLoading, layout, provider } = useWorkspaceLayoutCtx()
+  useWorkspaceHarnessChanges(id, provider)
   useWorkspaceTheme(layout.theme)
   const widgets = useWidgets(id)
   const views = useViews(id)
@@ -58,7 +62,7 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
       // widget:updated too: a rebundle bumps the widget's content revision, and
       // the thumbnail invalidation hook reads it off this query.
       queryClient.invalidateQueries({ queryKey: workspaceKeys.widgets(id) })
-    } else if (event.type === 'view-layout:updated' || event.type === 'view:updated') {
+    } else if (event.type === 'view:updated') {
       // view:updated also bumps the built bundle revision used by thumbnail
       // freshness checks.
       queryClient.invalidateQueries({ queryKey: workspaceKeys.views(id) })
@@ -69,14 +73,12 @@ function WorkspaceContent({ id }: WorkspaceRouteProps) {
     layoutLoading || selectedSessionId === undefined || widgets.isLoading || views.isLoading
 
   return (
-    <SidebarLayout>
-      {/* Reset the screen when switching between shared and browser tab state. */}
-      <WorkspaceScreen
-        key={collabEnabled ? 'browser-tab' : 'shared'}
-        contentPending={contentPending}
-        widgets={widgets.data}
-        views={views.data ?? []}
-      />
-    </SidebarLayout>
+    // Reset the screen when switching between shared and browser tab state.
+    <WorkspaceScreen
+      key={collabEnabled ? 'browser-tab' : 'shared'}
+      contentPending={contentPending}
+      widgets={widgets.data}
+      views={views.data ?? []}
+    />
   )
 }

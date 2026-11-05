@@ -1,17 +1,33 @@
 import type { NavigationRequest } from '@/lib/navigation'
-import type { AppSettings, HarnessAvailability, ViewInfo, WidgetInfo } from '@/lib/types'
+import type {
+  AppSettings,
+  CompiledView,
+  HarnessAvailability,
+  HarnessStatus,
+  WidgetInfo,
+  WorkspaceType,
+  WorkspaceState
+} from '@/lib/types'
 
 export type WorkspaceEvent =
+  | { type: 'connection:opened' }
+  | {
+      type: 'harness-status:changed'
+      harness: WorkspaceType
+      status: HarnessStatus
+    }
+  | { type: 'workspace-harness:switched'; workspaceId: string; harness: WorkspaceType }
   | { type: 'widget:updated'; name: string }
   | { type: 'widget-layout:updated'; widgets: WidgetInfo[] }
   // `moi refresh` — cache-bust and re-fetch applets without a rebuild. `only`
   // narrows to one kind; absent means both widgets and views.
   | { type: 'applets:refresh'; only?: 'widgets' | 'views' }
   | { type: 'view:updated'; name: string }
-  | { type: 'view-layout:updated'; views: ViewInfo[] }
+  | { type: 'view-layout:updated'; workspaceId: string; views: CompiledView[] }
   | { type: 'view:deleted'; workspaceId: string; name: string }
-  | { type: 'views:changed'; workspaceId: string }
-  | { type: 'selected-session:updated'; workspaceId: string; sessionId: string | null }
+  // A workspace's chat state changed (pin, selection, chat settings, views
+  // being built). Carries the whole state, so caches update without a refetch.
+  | { type: 'state:changed'; workspaceId: string; state: WorkspaceState }
   // `origin` on an event is the browser tab whose write caused it (absent for
   // CLI and agent changes), so that tab can skip its own echo. See
   // client/lib/browser-tab-id.ts.
@@ -122,6 +138,7 @@ export class WorkspaceEventsClient {
     socket.onopen = () => {
       this.reconnectAttempt = 0
       this.sendNavigationPresence()
+      for (const handler of this.listeners) handler({ type: 'connection:opened' })
     }
 
     socket.onmessage = event => {

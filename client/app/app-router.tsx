@@ -1,9 +1,12 @@
+import { OnboardingRoute } from './routes/onboarding-route'
 import { Suspense, lazy, useEffect } from 'react'
 
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 
 import { setWorkspaceSwitchHandler } from '@/client/features/chat/connection/chat-connection'
+import { useWorkspaceStateSync } from '@/client/features/workspace/workspace-state'
 
+import { SettingsRoute } from './routes/settings-route'
 import { HomeRoute } from './routes/home-route'
 import { WorkspaceRoute } from './routes/workspace-route'
 
@@ -29,6 +32,7 @@ function DevLazy() {
 // Top-level router — sets up all client-side routes
 export function AppRouter() {
   const [, navigate] = useLocation()
+  useWorkspaceStateSync()
 
   // When the server broadcasts a workspace:switch (e.g. from `moi start`),
   // navigate to that workspace
@@ -41,6 +45,8 @@ export function AppRouter() {
     <Switch>
       <Route path="/dev/*?" component={DevLazy} />
       <Route path="/" component={HomeRoute} />
+      <Route path="/onboarding" component={OnboardingRoute} />
+      <Route path="/settings" component={SettingsRoute} />
       {/* The wildcard is the destination path (`views/orders`, `overview`, …) —
           the URL is the tab address, read downstream with `useParams`. This
           pattern is its only definition. Keyed by workspace id only, so tab

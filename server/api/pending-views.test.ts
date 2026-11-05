@@ -1,26 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { DEFAULT_WORKSPACE_STATE_ROOT, setWorkspaceStateRoot } from '../workspace-state'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { PendingView } from '@/lib/types'
+import type { PendingView, WorkspaceState } from '@/lib/types'
 
 import { api } from './index'
-import { DATA_DIR } from '../data-dir'
 import { setEventServer } from '../events'
 import { codexHarness } from '../harness/codex'
 import type { SendMessageInput } from '../harness/types'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import {
-  DEFAULT_SELECTED_SESSION_PATH,
-  getSelectedSession,
-  saveSelectedSession,
-  setSelectedSessionPath
-} from '../sessions/selected'
+import { saveSelectedSession } from '../sessions/selected'
 import { viewTabId } from '@/lib/workspace-tabs'
 import { addUpload } from '../uploads'
-import { setPendingViewStorePath } from '../sessions/pending-views'
-import { DEFAULT_SESSION_STORE_PATH, setSessionStorePath } from '../sessions/store'
 
 let tempDir: string
 let events: { type: string; workspaceId?: string; sessionId?: string | null }[]
@@ -30,23 +23,23 @@ const originalCodexSendMessage = codexHarness.sendMessage
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), 'moi-api-pending-views-'))
   setRegistryPath(join(tempDir, 'workspaces.json'))
-  setSelectedSessionPath(join(tempDir, 'selected-sessions.json'))
-  setPendingViewStorePath(join(tempDir, 'pending-views.json'))
-  setSessionStorePath(join(tempDir, 'sessions.json'))
+  setWorkspaceStateRoot(join(tempDir, 'state'))
   codexHarness.availability = async () => ({ status: 'available' })
   codexHarness.sendMessage = async () => {}
   events = []
   setEventServer({ publish: (_topic, data) => events.push(JSON.parse(data)) })
 })
 
+async function workspaceState(workspaceId: string): Promise<WorkspaceState> {
+  return (await api.request(`/api/workspaces/${workspaceId}/state`)).json()
+}
+
 afterEach(async () => {
   codexHarness.availability = originalCodexAvailability
   codexHarness.sendMessage = originalCodexSendMessage
   setEventServer({ publish: () => {} })
   setRegistryPath(DEFAULT_REGISTRY_PATH)
-  setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
-  setPendingViewStorePath(join(DATA_DIR, 'pending-views.json'))
-  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   await rm(tempDir, { recursive: true, force: true })
 })
 
@@ -190,10 +183,9 @@ describe('pending view availability', () => {
     expect(response.status).toBe(400)
     expect(await response.text()).toBe(reason)
 
-    const listResponse = await api.request(`/api/workspaces/${workspace.id}/views`)
-    const { views } = (await listResponse.json()) as { views: PendingView[] }
-    expect(views).toHaveLength(1)
-    expect(views[0].status).toBe('draft')
+    const { pendingViews } = await workspaceState(workspace.id)
+    expect(Object.keys(pendingViews)).toEqual([draft.id])
+    expect(pendingViews[draft.id].status).toBe('draft')
   })
 })
 
@@ -209,8 +201,7 @@ describe('pending view chat selection', () => {
       method: 'POST'
     })
     const draft = (await createResponse.json()) as PendingView
-    if (previous)
-      await saveSelectedSession(workspace.path, previous, undefined, viewTabId(draft.id))
+    if (previous) await saveSelectedSession(workspace, previous, viewTabId(draft.id))
     const sent: SendMessageInput[] = []
     codexHarness.sendMessage = async input => {
       sent.push(input)
@@ -229,20 +220,14 @@ describe('pending view chat selection', () => {
     const result = (await response.json()) as { sessionId: string }
     expect(sent).toHaveLength(1)
     expect(sent[0]).toMatchObject({ sessionId: result.sessionId, isNew: true })
-    expect(await getSelectedSession(workspace.path, viewTabId(draft.id))).toBe(
+    const expected =
       selectedSessionScope === 'browser-tab' ? (previous ?? undefined) : result.sessionId
-    )
-    expect(events.filter(event => event.type === 'selected-session:updated')).toEqual(
-      selectedSessionScope === 'browser-tab'
-        ? []
-        : [
-            {
-              type: 'selected-session:updated',
-              workspaceId: workspace.id,
-              sessionId: result.sessionId
-            }
-          ]
-    )
+    expect((await workspaceState(workspace.id)).selected[viewTabId(draft.id)]).toBe(expected)
+    // Other browser tabs hear the selection through the published state.
+    const published = events.filter(event => event.type === 'state:changed').at(-1) as
+      | { state: WorkspaceState }
+      | undefined
+    expect(published?.state.selected[viewTabId(draft.id)]).toBe(expected)
   })
 
   test('rejects a malformed selection scope before starting a view', async () => {
@@ -262,9 +247,8 @@ describe('pending view chat selection', () => {
 
     expect(response.status).toBe(400)
     expect(await response.text()).toBe('Invalid selectedSessionScope')
-    const listResponse = await api.request(`/api/workspaces/${workspace.id}/views`)
-    const { views } = (await listResponse.json()) as { views: PendingView[] }
-    expect(views[0].status).toBe('draft')
-    expect(events.filter(event => event.type === 'selected-session:updated')).toEqual([])
+    expect((await workspaceState(workspace.id)).pendingViews[draft.id].status).toBe('draft')
+    // Only creating the draft changed the state.
+    expect(events.filter(event => event.type === 'state:changed')).toHaveLength(1)
   })
 })

@@ -3,12 +3,8 @@ import { useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { workspaceKeys } from '@/client/api/workspace-keys'
-import {
-  useSession,
-  useSessionView,
-  useWorkspaceSessions
-} from '@/client/features/chat/sessions/api'
-import { useWorkspaceAgent } from '@/client/features/workspace/api'
+import { useSessionState, useSessionView } from '@/client/features/chat/sessions/api'
+import { useWorkspaceHarness } from '@/client/features/workspace/api'
 import { useSelectedSession } from '@/client/features/chat/sessions/use-selected-session'
 import { useCollabEnabled } from '@/client/features/collab'
 import {
@@ -58,8 +54,7 @@ export function useChat(address: WorkspaceTabAddress) {
   const { layout } = useWorkspaceLayoutCtx()
   const [selectedSession, selectSession] = useSelectedSession(address.activeTab)
   const collabEnabled = useCollabEnabled()
-  const modelsData = useWorkspaceAgent(workspaceId).data
-  const sessions = useWorkspaceSessions(workspaceId).data
+  const modelsData = useWorkspaceHarness(workspaceId).data
   // A newly forked/native session can precede the provider's session listing.
   // Archive explicitly clears selection; a stale catalog must not do so.
   const selectedSessionId = selectedSession ?? null
@@ -79,20 +74,20 @@ export function useChat(address: WorkspaceTabAddress) {
 
   const viewQuery = useSessionView(workspaceId, selectedSessionId)
   const { refetch } = viewQuery
-  const session = useSession(workspaceId, selectedSessionId)
+  // Tab, settings and fork history, from the workspace state.
+  const session = useSessionState(workspaceId, selectedSessionId)
   const { refetch: refetchSession } = session
   const retryLoad = useCallback(async () => {
     await refetch()
     await refetchSession()
   }, [refetch, refetchSession])
-  const forkedFromSessionId = session.data?.forkedFromSessionId
+  const fork = session.data?.fork
   const sessionReady = !selectedSessionId || session.data !== undefined
   let view = sessionReady ? (viewQuery.data ?? EMPTY) : EMPTY
-  if (viewQuery.data && forkedFromSessionId) view = visibleForkHistory(viewQuery.data, session.data)
+  if (viewQuery.data && fork) view = visibleForkHistory(viewQuery.data, fork)
   const chatLoaded =
     selectedSession !== undefined &&
     sessionReady &&
-    sessions !== undefined &&
     (selectedSessionId === null || viewQuery.data !== undefined)
 
   // The live streaming preview as a synthetic assistant turn, so the ChatPanel
@@ -163,12 +158,12 @@ export function useChat(address: WorkspaceTabAddress) {
       // Validate effort and Fast mode against that same resolved row.
       const pickedModel = sessionConfig?.model ?? layout.selectedModel
       const pickedEffort = sessionConfig?.effort ?? layout.selectedEffort
-      const pickedFastMode = sessionConfig?.fastMode ?? layout.selectedFastMode
-      const { model, effort, fastMode, stream } = resolveChatRunOptions(
+      const pickedSpeedMode = sessionConfig?.speedMode ?? layout.selectedSpeedMode
+      const { model, effort, speedMode, stream } = resolveChatRunOptions(
         modelsData,
         pickedModel,
         pickedEffort,
-        pickedFastMode
+        pickedSpeedMode
       )
       sendMessage({
         type: 'chat',
@@ -180,7 +175,7 @@ export function useChat(address: WorkspaceTabAddress) {
         optimisticId,
         model,
         effort,
-        fastMode,
+        speedMode,
         stream,
         context: buildMoiContext(options),
         ...(attachments.length > 0 ? { attachments } : {})
@@ -198,11 +193,11 @@ export function useChat(address: WorkspaceTabAddress) {
       qc,
       layout.selectedModel,
       layout.selectedEffort,
-      layout.selectedFastMode,
+      layout.selectedSpeedMode,
       buildMoiContext,
       sessionConfig?.model,
       sessionConfig?.effort,
-      sessionConfig?.fastMode,
+      sessionConfig?.speedMode,
       selectSession,
       collabEnabled,
       modelsData
@@ -221,7 +216,7 @@ export function useChat(address: WorkspaceTabAddress) {
 
   return {
     view,
-    forkedFromSessionId,
+    forkedFromSessionId: fork?.fromSessionId,
     chatLoaded,
     previewTurn,
     sessionId: selectedSessionId,

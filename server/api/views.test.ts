@@ -1,38 +1,28 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import {
+  DEFAULT_WORKSPACE_STATE_ROOT,
+  setWorkspaceStateRoot,
+  type WorkspaceRef
+} from '../workspace-state'
 import { unlinkSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { stringify } from 'devalue'
 
-import type { ViewInfo } from '@/lib/types'
+import type { ViewInfo, WorkspaceState } from '@/lib/types'
 
 import { api } from './index'
-import { DATA_DIR } from '../data-dir'
 import { setEventServer } from '../events'
 import { codexHarness } from '../harness/codex'
 import { getClientFrameLog } from '../harness/debug'
 import { loadLayout, saveLayout } from '../workspaces/layout'
 import { DEFAULT_REGISTRY_PATH, registerWorkspace, setRegistryPath } from '../workspaces/registry'
-import {
-  listPendingViews,
-  createPendingView,
-  setPendingViewStorePath
-} from '../sessions/pending-views'
+import { listPendingViews, createPendingView } from '../sessions/pending-views'
 import { buildAllViews, handleBundleViews, updateViewTitle } from '../applets/views'
-import {
-  DEFAULT_SESSION_STORE_PATH,
-  getSessionRecord,
-  patchSessionRecord,
-  setSessionStorePath
-} from '../sessions/store'
-import {
-  DEFAULT_SELECTED_SESSION_PATH,
-  getWorkspaceSessionSelection,
-  pinSession,
-  saveSelectedSession,
-  setSelectedSessionPath
-} from '../sessions/selected'
+import { getSessionEntry, updateSessionEntry } from '../sessions/store'
+import { pinSession, saveSelectedSession } from '../sessions/selected'
+import { readWorkspaceState } from '../workspace-state'
 import { silenceConsole } from '../test/quiet'
 
 silenceConsole('log')
@@ -41,6 +31,7 @@ silenceConsole('error')
 let tempDir: string
 let workspaceDir: string
 let workspaceId: string
+let ws: WorkspaceRef
 let sourcePath: string
 let serverPath: string
 let sharedPath: string
@@ -77,15 +68,14 @@ beforeEach(async () => {
   ])
 
   setRegistryPath(join(tempDir, 'workspaces.json'))
-  setPendingViewStorePath(join(tempDir, 'pending-views.json'))
-  setSessionStorePath(join(tempDir, 'sessions.json'))
-  setSelectedSessionPath(join(tempDir, 'selected-sessions.json'))
+  setWorkspaceStateRoot(join(tempDir, 'state'))
   archived = []
   codexHarness.interrupt = async () => {}
   codexHarness.archiveSession = async (_, sessionId) => {
     archived.push(sessionId)
   }
   workspaceId = (await registerWorkspace(workspaceDir, { type: 'codex' })).id
+  ws = { id: workspaceId, path: workspaceDir }
   published = []
   setEventServer({ publish: (_topic, data) => published.push(JSON.parse(data)) })
   await buildAllViews(workspaceDir)
@@ -94,9 +84,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   setRegistryPath(DEFAULT_REGISTRY_PATH)
-  setPendingViewStorePath(join(DATA_DIR, 'pending-views.json'))
-  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
-  setSelectedSessionPath(DEFAULT_SELECTED_SESSION_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   codexHarness.interrupt = originalInterrupt
   codexHarness.archiveSession = originalArchive
   setEventServer({ publish: () => {} })
@@ -133,7 +121,7 @@ test('renaming rebuilds only the selected view and preserves pending views', asy
     join(workspaceDir, '.moi', 'views', 'draft.tsx'),
     'export default function Draft() { return <div>Draft</div> }'
   )
-  const pendingViewsBefore = await listPendingViews(workspaceDir)
+  const pendingViewsBefore = await listPendingViews(ws)
   const tabsBefore = (await loadLayout(workspaceDir)).tabs
 
   const response = await api.request(`/api/workspaces/${workspaceId}/views/cards`, {
@@ -151,7 +139,7 @@ test('renaming rebuilds only the selected view and preserves pending views', asy
   expect(
     await Bun.file(join(workspaceDir, '.moi', '.build', 'views', 'draft', 'index.js')).exists()
   ).toBe(false)
-  expect(await listPendingViews(workspaceDir)).toEqual(pendingViewsBefore)
+  expect(await listPendingViews(ws)).toEqual(pendingViewsBefore)
   expect((await loadLayout(workspaceDir)).tabs).toEqual(tabsBefore)
   expect(published).not.toContainEqual(
     expect.objectContaining({ type: 'view:updated', name: 'draft' })
@@ -220,16 +208,15 @@ test('a failed rename does not recreate a source removed during the rebuild', as
 test('deletes a view and its owned state while preserving shared files and data', async () => {
   const metadata = {
     tabId: 'views/cards' as const,
-    forkedFromSessionId: 'source',
-    forkedThroughMessageId: 'boundary'
+    fork: { fromSessionId: 'source', throughMessageId: 'boundary' }
   }
-  await patchSessionRecord(workspaceDir, 'child', metadata)
-  await patchSessionRecord(workspaceDir, 'follow-up', { tabId: 'views/cards' })
-  await patchSessionRecord(workspaceDir, 'sibling', { tabId: 'views/other' })
-  await patchSessionRecord(workspaceDir, 'workspace', { config: { model: 'test-model' } })
-  await saveSelectedSession(workspaceDir, 'child', undefined, 'views/cards')
-  await saveSelectedSession(workspaceDir, 'child')
-  await pinSession(workspaceDir, 'follow-up')
+  await updateSessionEntry(ws, 'child', metadata)
+  await updateSessionEntry(ws, 'follow-up', { tabId: 'views/cards' })
+  await updateSessionEntry(ws, 'sibling', { tabId: 'views/other' })
+  await updateSessionEntry(ws, 'workspace', { config: { model: 'test-model' } })
+  await saveSelectedSession(ws, 'child', 'views/cards')
+  await saveSelectedSession(ws, 'child')
+  await pinSession(ws, 'follow-up')
   await saveLayout(
     {
       ...(await loadLayout(workspaceDir)),
@@ -249,8 +236,10 @@ test('deletes a view and its owned state while preserving shared files and data'
 
   expect(response.status).toBe(204)
   expect(archived).toEqual(['child', 'follow-up'])
-  expect(await getSessionRecord(workspaceDir, 'child')).toEqual(metadata)
-  expect(await getWorkspaceSessionSelection(workspaceDir)).toEqual({ selected: {}, pinned: null })
+  expect(await getSessionEntry(ws, 'child')).toEqual(metadata)
+  const state = await readWorkspaceState(ws)
+  expect(state.selected).toEqual({})
+  expect(state.pinnedSessionId).toBeUndefined()
   expect(getClientFrameLog(workspaceId).map(entry => entry.frame)).toEqual(
     expect.arrayContaining(
       archived.map(sessionId => ({
@@ -264,7 +253,7 @@ test('deletes a view and its owned state while preserving shared files and data'
   expect(await Bun.file(serverPath).exists()).toBe(false)
   expect(await Bun.file(sharedPath).exists()).toBe(true)
   expect(await Bun.file(dataPath).exists()).toBe(true)
-  expect(await listPendingViews(workspaceDir)).toEqual([])
+  expect(await listPendingViews(ws)).toEqual([])
   expect((await loadLayout(workspaceDir)).tabs).toEqual({
     open: ['overview'],
     active: 'overview'
@@ -302,7 +291,7 @@ test('deleting a view keeps a shared server module callable and the remaining vi
 })
 
 test('deleting a view does not build or complete an unfinished sibling', async () => {
-  const draft = await createPendingView(workspaceId, workspaceDir, { status: 'submitted' })
+  const draft = await createPendingView(ws, { status: 'submitted' })
   const draftPath = join(workspaceDir, '.moi', 'views', `${draft.id}.tsx`)
   await Bun.write(draftPath, 'export default function Draft() { return <div>Draft</div> }')
 
@@ -314,7 +303,7 @@ test('deleting a view does not build or complete an unfinished sibling', async (
   expect(
     await Bun.file(join(workspaceDir, '.moi', '.build', 'views', draft.id, 'index.js')).exists()
   ).toBe(false)
-  expect(await listPendingViews(workspaceDir)).toEqual([
+  expect(await listPendingViews(ws)).toEqual([
     expect.objectContaining({
       id: draft.id,
       status: 'submitted'
@@ -326,7 +315,7 @@ test('deleting a view does not build or complete an unfinished sibling', async (
 })
 
 test('rejects deleting a source imported by another applet before removing any files', async () => {
-  await patchSessionRecord(workspaceDir, 'child', { tabId: 'views/cards' })
+  await updateSessionEntry(ws, 'child', { tabId: 'views/cards' })
   await Bun.write(
     join(workspaceDir, '.moi', 'views', 'summary.tsx'),
     "export { default } from './cards'"
@@ -343,8 +332,8 @@ test('rejects deleting a source imported by another applet before removing any f
 })
 
 test('archive failure leaves compiled view files, chats and tabs available to retry', async () => {
-  await patchSessionRecord(workspaceDir, 'child', { tabId: 'views/cards' })
-  await saveSelectedSession(workspaceDir, 'child', undefined, 'views/cards')
+  await updateSessionEntry(ws, 'child', { tabId: 'views/cards' })
+  await saveSelectedSession(ws, 'child', 'views/cards')
   codexHarness.archiveSession = async () => {
     throw new Error('Archive failed')
   }
@@ -354,26 +343,43 @@ test('archive failure leaves compiled view files, chats and tabs available to re
   expect(response.status).toBe(500)
   expect(await Bun.file(sourcePath).exists()).toBe(true)
   expect(await Bun.file(serverPath).exists()).toBe(true)
-  expect((await getWorkspaceSessionSelection(workspaceDir)).selected['views/cards']).toBe('child')
+  expect((await readWorkspaceState(ws)).selected['views/cards']).toBe('child')
   expect(published).not.toContainEqual({ type: 'view:deleted', workspaceId, name: 'cards' })
 })
 
-test('one view list keeps the same identity when a pending view is bundled', async () => {
-  const view = await createPendingView(workspaceId, workspaceDir)
+test('a bundled pending view moves from the state to the compiled list', async () => {
+  const view = await createPendingView(ws)
   const list = async () =>
     (await (await api.request(`/api/workspaces/${workspaceId}/views`)).json()) as {
       views: ViewInfo[]
     }
-  expect((await list()).views.map(view => view.id)).toEqual(['cards', view.id])
-  expect((await list()).views.find(item => item.id === view.id)?.status).toBe('draft')
+  const pending = async () =>
+    ((await (await api.request(`/api/workspaces/${workspaceId}/state`)).json()) as WorkspaceState)
+      .pendingViews
+  expect((await list()).views.map(view => view.id)).toEqual(['cards'])
+  expect((await pending())[view.id]?.status).toBe('draft')
   await writeFile(
     join(workspaceDir, '.moi', 'views', `${view.id}.tsx`),
     "export const config = { title: 'Finished', icon: 'book' }; export default function View() { return <div>Finished</div> }"
   )
+  published = []
   await handleBundleViews(event => published.push(event), workspaceId, workspaceDir, false, view.id)
+  const layoutIndex = published.findIndex(
+    event => (event as { type: string }).type === 'view-layout:updated'
+  )
+  const completedIndex = published.findIndex(
+    event => (event as { type: string }).type === 'state:changed'
+  )
+  expect(layoutIndex).toBeGreaterThanOrEqual(0)
+  expect(completedIndex).toBeGreaterThan(layoutIndex)
+  expect(published[layoutIndex]).toMatchObject({
+    workspaceId,
+    views: expect.arrayContaining([expect.objectContaining({ id: view.id, status: 'compiled' })])
+  })
   const result = (await list()).views.filter(item => item.id === view.id)
   expect(result).toHaveLength(1)
   expect(result[0].status).toBe('compiled')
   expect(result[0]).toMatchObject({ title: 'Finished', icon: 'book' })
-  expect(await listPendingViews(workspaceDir)).toEqual([])
+  expect(await pending()).toEqual({})
+  expect(await listPendingViews(ws)).toEqual([])
 })

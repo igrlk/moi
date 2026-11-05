@@ -23,7 +23,7 @@ import { WorkspaceWelcomeState } from '@/client/features/workspace/setup/workspa
 import { WorkspaceLoadingState } from '@/client/features/workspace/setup/workspace-recovery-states'
 import type { AppEnvironment } from '@/lib/types'
 import { workspaceTypeLabel } from '@/client/features/workspace/workspace-presentation'
-import { useHarnessAuth, type LoginHarness } from '@/client/features/harness/api'
+import { useHarnessStatus, type LoginHarness } from '@/client/features/harness/api'
 import {
   createSetupMocks,
   MOCK_SIGN_IN_URL,
@@ -35,8 +35,8 @@ import type { SetupScenario } from './workspace-setup-mocks'
 
 const scenarioLabels: Record<SetupScenario, string> = {
   welcome: 'Welcome',
-  login: 'Login',
-  'missing-agent': 'Agent missing',
+  login: 'Log in',
+  install: 'Install',
   'missing-folder': 'Folder missing',
   loading: 'Loading'
 }
@@ -53,7 +53,7 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
   const [provider, setProvider] = useState<'browser' | 'code' | 'closed'>()
   const [deviceCode, setDeviceCode] = useState('')
   const [layout, setLayout] = useState(createDefaultWorkspaceLayout)
-  const auth = useHarnessAuth(harness)
+  const auth = useHarnessStatus(harness)
   const pendingId = auth.data?.login?.state === 'pending' ? auth.data.login.id : undefined
   // Both local harnesses open the browser automatically.
   const providerPage = provider ?? (environment === 'local' && pendingId ? 'browser' : 'closed')
@@ -85,7 +85,12 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
               key={value}
               size="sm"
               variant={environment === value ? 'default' : 'secondary'}
-              onClick={() => restart({ environment: value })}
+              onClick={() =>
+                restart({
+                  environment: value,
+                  scenario: value === 'cloud' && scenario === 'install' ? 'login' : scenario
+                })
+              }
             >
               {value === 'local' ? 'Local' : 'Cloud'}
             </Button>
@@ -109,21 +114,10 @@ function SetupPreview({ mocks, client, environment, harness, scenario }: SetupPr
               key={value}
               size="sm"
               variant={scenario === value ? 'default' : 'secondary'}
+              disabled={value === 'install' && environment === 'cloud'}
               onClick={() => restart({ scenario: value })}
             >
               {scenarioLabels[value]}
-            </Button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Layout">
-          {(['split', 'fullscreen'] as const).map(layoutMode => (
-            <Button
-              key={layoutMode}
-              size="sm"
-              variant={layout.layoutMode === layoutMode ? 'default' : 'secondary'}
-              onClick={() => setLayout(current => ({ ...current, layoutMode }))}
-            >
-              {layoutMode === 'split' ? 'Split' : 'Fullscreen'}
             </Button>
           ))}
         </div>

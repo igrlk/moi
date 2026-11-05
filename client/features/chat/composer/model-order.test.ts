@@ -5,7 +5,7 @@ import {
   hasEffortChoice,
   resolveDisplayedEffort,
   resolveEffortIndex,
-  resolveFastMode,
+  resolveSpeedMode,
   sortModelsByProviderOrder
 } from '@/client/features/chat/composer/model-order'
 import type { Model } from '@/lib/types'
@@ -13,6 +13,15 @@ import type { Model } from '@/lib/types'
 function model(value: string, resolvedModel?: string): Model {
   return { value, resolvedModel, displayName: value }
 }
+
+test('Ultrafast selection and defaults follow the selected model capabilities', () => {
+  const supported = { ...model('sol'), supportsFastMode: true, supportsUltrafastMode: true }
+  expect(resolveSpeedMode(supported, 'ultrafast')).toBe('ultrafast')
+  expect(resolveSpeedMode(supported, undefined)).toBe('normal')
+  expect(resolveSpeedMode(supported, 'normal')).toBe('normal')
+  expect(resolveSpeedMode({ ...supported, supportsUltrafastMode: false }, 'ultrafast')).toBe('fast')
+  expect(resolveSpeedMode(model('no-speed-modes'), 'ultrafast')).toBe('normal')
+})
 
 describe('sortModelsByProviderOrder', () => {
   test('orders Anthropic model families while preserving SDK order within each family', () => {
@@ -149,24 +158,23 @@ describe('hasEffortChoice', () => {
   })
 })
 
-describe('resolveFastMode', () => {
-  const supported = {
+describe('resolveSpeedMode', () => {
+  const supported: Model = {
     ...model('fast-model'),
-    supportsFastMode: true,
-    defaultFastMode: true
+    supportsFastMode: true
   }
 
-  test('uses the provider default until moi stores a preference', () => {
-    expect(resolveFastMode(supported, undefined)).toBe(true)
+  test('uses normal when no preference is stored', () => {
+    expect(resolveSpeedMode(supported, undefined)).toBe('normal')
   })
 
-  test('lets an explicit moi preference override the provider default', () => {
-    expect(resolveFastMode(supported, false)).toBe(false)
-    expect(resolveFastMode({ ...supported, defaultFastMode: false }, true)).toBe(true)
+  test('honors explicit normal and fast preferences', () => {
+    expect(resolveSpeedMode(supported, 'normal')).toBe('normal')
+    expect(resolveSpeedMode(supported, 'fast')).toBe('fast')
   })
 
   test('stays disabled for an unsupported model', () => {
-    expect(resolveFastMode(model('unsupported'), true)).toBe(false)
+    expect(resolveSpeedMode(model('unsupported'), 'fast')).toBe('normal')
   })
 })
 

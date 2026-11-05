@@ -1,6 +1,5 @@
 import type { PreviewBlock, StreamEvent } from './format'
-import type { AppIconId } from './app-icons'
-import type { ExperimentalFeatures } from './experimental'
+import type { IdentityIconId } from './identity-icons'
 import type { MoiContext } from './moi-context'
 import type { WorkspaceTheme } from './themes'
 import type { AttachmentInput, WidgetConfig } from 'moi'
@@ -39,8 +38,9 @@ export type PendingView = {
   title?: string
   icon?: string
   requirements: string
-  // Execution reference only. Ownership lives in SessionRecord.tabId.
-  executionSessionId?: string
+  // The chat running the build: usually the view tab's own chat, or the
+  // pinned chat when one is pinned. Ownership lives in the chat's `tabId`.
+  buildSessionId?: string
   error?: string
 }
 
@@ -257,9 +257,8 @@ export type ClientMessage =
       // Omitted means the provider default. Harnesses apply changes before the
       // next send (see server/harness/claude-code/session.ts).
       effort?: string
-      // Opt into the selected model's faster processing mode. Omitted inherits
-      // the provider configuration; false explicitly disables a stored default.
-      fastMode?: boolean
+      // Select processing speed. Omitted uses normal, overriding provider defaults.
+      speedMode?: SpeedMode
       // Opt into live token-by-token streaming for this turn. Omitted/false runs
       // the current whole-block behavior. Only honored for providers that report
       // `supportsStreaming` (Claude Code); ignored otherwise. Like effort, a
@@ -290,81 +289,75 @@ export type SessionSummary = {
   flavor?: 'chat' | 'cron' | 'subagent'
 }
 
-// Per-session agent settings, persisted server-side in one global file in Moi's
-// data dir (NOT in the workspace), exposed via GET/PUT
-// /api/workspaces/:id/sessions/:sessionId/config. A session reopens with the same
-// model/effort/Fast mode it last ran with; a brand-new session is seeded from the
-// corresponding workspace defaults.
+// Missing speed mode behaves as normal.
+export type SpeedMode = 'normal' | 'fast' | 'ultrafast'
+
+// Per-chat agent settings, overriding the workspace defaults in
+// `.moi/.workspace.json`. A chat reopens with the model/effort/speed mode it
+// last ran with; a brand-new chat is seeded from the workspace defaults.
 export type SessionConfig = {
   model?: string
   effort?: string
-  fastMode?: boolean
+  speedMode?: SpeedMode
 }
 
-type SessionForkFields =
-  | {
-      forkedFromSessionId?: undefined
-      forkedThroughMessageId?: never
-      forkedNoticeIds?: never
-    }
-  | {
-      forkedFromSessionId: string
-      // Last copied turn in the child. Without a cutoff, show its full history.
-      forkedThroughMessageId?: string
-      forkedNoticeIds?: string[]
-    }
+export type SessionFork = {
+  fromSessionId: string
+  // Last copied turn in the child. Without a cutoff, show its full history.
+  throughMessageId?: string
+  noticeIds?: string[]
+}
 
-// Local session fields shared by the saved record and session-list rows.
-type SessionMetadata = {
+// Moi's own record of one chat. Titles and history stay with the agent.
+export type WorkspaceSessionState = {
+  // The view tab that owns this chat; absent means the overview.
   tabId?: WorkspaceTabId
-} & SessionForkFields
-
-export type SessionRecord = SessionMetadata & {
   config?: SessionConfig
+  fork?: SessionFork
 }
 
-export type SessionRecordPatch = Partial<Pick<SessionRecord, 'tabId' | 'config'>> &
-  SessionForkFields
-
-// List row returned to the client after local metadata is added.
-export type SessionInfo = SessionSummary & SessionMetadata
-
-export type SelectedSessionState = {
-  sessionId: string | null
+// Per-user chat state for one workspace, kept in Moi's data dir and served by
+// GET /api/workspaces/:id/state. Every write returns it and publishes it as
+// `state:changed`.
+export type WorkspaceState = {
+  // Goes up by one with every saved change. Lets clients drop an older copy
+  // that arrives after a newer one.
+  revision: number
+  // Applies to every tab and overrides `selected`.
+  pinnedSessionId?: string
+  // The chat each tab shows.
+  selected: Partial<Record<WorkspaceTabId, string>>
+  sessions: Record<string, WorkspaceSessionState>
+  // Views not compiled yet, keyed by view id.
+  pendingViews: Record<string, Omit<PendingView, 'id'>>
 }
 
-export type WorkspaceSessionSelection = {
-  // A browser tab can explicitly choose an empty chat (null). An absent key
-  // inherits the server selection, including CLI-created view handoffs.
-  selected: Partial<Record<WorkspaceTabId, string | null>>
-  pinned: string | null
-}
+// A chat-list row: the agent's session plus the tab that owns it.
+export type SessionInfo = SessionSummary & { tabId?: WorkspaceTabId }
 
 // App-wide settings, persisted server-side as `settings.json` in Moi's data
 // dir and exposed via GET/PATCH /api/settings. Every key has a default, so
 // GET always returns a complete object.
 export type AppSettings = {
+  showOnboarding: boolean
   // Apply bundled workspace-skill updates automatically when a workspace
   // with outdated skills is opened, instead of prompting each time.
   autoUpdateSkills: boolean
 }
 
 // Client-safe startup config, served by GET /api/config. Deployment settings
-// come from config.json and MOI_* env overrides; experimental flags come from
-// explicit CLI options. See server/app-config.ts.
+// come from config.json and MOI_* env overrides. See server/app-config.ts.
 export type AppEnvironment = 'local' | 'cloud'
 
 export type ClientAppConfig = {
   environment: AppEnvironment
+  collab: boolean
   // Demo mode: workspace creation is blocked; the UI offers the
   // cloud-demo promo dialog instead.
   demo: boolean
-  experimental: ExperimentalFeatures
   // Link target for the cloud-demo promo dialog.
   demoInstallUrl: string
 }
-
-export type { ExperimentalFeatures } from './experimental'
 
 export type UpdateStatus = {
   runningVersion: string
@@ -474,6 +467,7 @@ export type WorkspaceType = 'claude-code' | 'openclaw' | 'codex' | 'hermes'
 
 export type WorkspaceSkillStatus = {
   name: string
+  path: string
   installed: string | null
   bundled: string | null
 }
@@ -489,8 +483,10 @@ export type WorkspaceSkillsUpdateFailure = WorkspaceSkillsStatus & {
 
 export type HarnessInstallations = Record<WorkspaceType, boolean>
 
-// Setup checks only runtime availability. Workspace checks may also report
-// that the provider needs a login the host can start.
+// Shared runtime/account readiness and the current sign-in attempt.
+export type HarnessStatus = { availability: HarnessAvailability; login?: HarnessLoginState }
+export type HarnessStatuses = Record<WorkspaceType, HarnessStatus>
+
 export type HarnessAvailability =
   | { status: 'available' }
   | { status: 'login-required'; reason: string }
@@ -513,7 +509,7 @@ export type HarnessLoginState =
 
 export type WorkspaceIcon =
   | { type: 'emoji'; value: string; background?: 'theme' }
-  | { type: 'glyph'; value: AppIconId; background?: 'theme' }
+  | { type: 'glyph'; value: IdentityIconId; background?: 'theme' }
   | { type: 'upload'; value: string }
 
 // One MCP server's connection status, as surfaced by GET /api/workspaces/:id/mcp
@@ -629,7 +625,11 @@ export type WorkspaceTabsState = {
 
 export type { AgentTheme, ColorTheme, FontTheme, RadiusTheme, WorkspaceTheme } from './themes'
 
-export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & { tabs?: WorkspaceTabsState }
+export type WorkspaceLayoutSave = Omit<WorkspaceLayout, 'tabs'> & {
+  tabs?: WorkspaceTabsState
+  // Captured when the edit is made, so delayed saves cannot restore another harness's defaults.
+  harness?: WorkspaceType
+}
 
 export type WorkspaceLayout = {
   version: 1
@@ -649,16 +649,24 @@ export type WorkspaceLayout = {
   // the transcript records the *resolved* id (e.g. `claude-sonnet-4-6`), which
   // doesn't map back to these aliases — hence we persist the pick here.
   //
-  // This (with `selectedEffort` and `selectedFastMode`) is the *workspace
+  // This (with `selectedEffort` and `selectedSpeedMode`) is the *workspace
   // default*: the value the picker edits when no session is open, and the seed a
   // brand-new session copies. Once a session exists it carries its own per-session
   // override (see `SessionConfig`).
   selectedModel?: string
   // Reasoning-effort default for new sessions (a `supportedEffortLevels` value).
   selectedEffort?: string
-  // Fast-mode default for new sessions. Undefined inherits the provider setting.
-  selectedFastMode?: boolean
+  // Speed default for new sessions. Undefined behaves as normal.
+  selectedSpeedMode?: SpeedMode
   theme?: WorkspaceTheme
+}
+
+// GET /api/workspaces/:id: layout plus the local workspace registration.
+export type WorkspaceLayoutResponse = WorkspaceLayout & {
+  cwd: string
+  name: string
+  provider?: WorkspaceType
+  agentId?: string
 }
 
 // One applet's thumbnail freshness record. Image bytes live as files in the
@@ -761,16 +769,17 @@ export type Model = {
   defaultEffort?: string
   supportsAdaptiveThinking?: boolean
   supportsFastMode?: boolean
-  // Provider-resolved default when moi has no stored Fast-mode preference.
-  defaultFastMode?: boolean
+  supportsUltrafastMode?: boolean
   supportsAutoMode?: boolean
 }
 
-// GET /api/workspaces/:id/agent. Model changes arrive on refetch;
+// GET /api/workspaces/:id/harness. Model changes arrive on refetch;
 // `harness:updated` events refresh availability.
-export type WorkspaceAgent = {
-  workspaceFolderMissing?: boolean
-  // The agent backend that produced this snapshot — matches the workspace
+export type WorkspaceHarness = {
+  /** Credential overrides require workspace readiness instead of shared account status. */
+  hasAuthOverrides?: boolean
+  isFolderMissing?: boolean
+  // The harness that produced this snapshot — matches the workspace
   // provider.
   provider: WorkspaceType
   // Runtime presence and provider auth state, from the server-side cache.

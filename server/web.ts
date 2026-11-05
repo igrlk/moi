@@ -1,3 +1,4 @@
+import { isSpeedMode } from '@/lib/speed-mode'
 import type { UserProfile } from '@/lib/collab/types'
 import { isMessageAttachments } from '@/lib/message-attachments'
 import type { ClientMessage, StatusSnapshotMessage } from '@/lib/types'
@@ -10,7 +11,6 @@ import devSandbox from '../client/dev/index.html'
 import { api } from './api'
 import { getAppConfig } from './app-config'
 import { harnessStore } from './harness/auth'
-import { AttachmentUploadError } from './sessions/attachment-message'
 import { PORT } from './constants'
 import { control } from './control'
 import { proxyUserState } from './collab/cloudflare-access'
@@ -25,7 +25,8 @@ import { resolveScratchOp } from './scratchpad/relay'
 import { allHarnesses, harnessFor } from './harness/registry'
 import { getWorkspace, listWorkspaces } from './workspaces/registry'
 import { failInterruptedViewStarts, sendWorkspaceMessage } from './sessions/view-sessions'
-import { PendingViewError } from './sessions/pending-views'
+import { prepareWorkspaceStates } from './workspace-state'
+import { migrateLegacyWorkspaceState } from './workspace-state/legacy-migration'
 import {
   addClient,
   broadcast,
@@ -59,7 +60,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
     optimisticId?: unknown
     model?: unknown
     effort?: unknown
-    fastMode?: unknown
+    speedMode?: unknown
     stream?: unknown
     context?: unknown
     attachments?: unknown
@@ -77,7 +78,7 @@ function isClientMessage(value: unknown): value is ClientMessage {
       (v.optimisticId === undefined || typeof v.optimisticId === 'string') &&
       (v.model === undefined || typeof v.model === 'string') &&
       (v.effort === undefined || typeof v.effort === 'string') &&
-      (v.fastMode === undefined || typeof v.fastMode === 'boolean') &&
+      (v.speedMode === undefined || isSpeedMode(v.speedMode)) &&
       (v.stream === undefined || typeof v.stream === 'boolean') &&
       (v.context === undefined || isMoiContext(v.context)) &&
       (v.attachments === undefined || isMessageAttachments(v.attachments))
@@ -110,7 +111,10 @@ function upgrade(server: Upgradable, req: Request, data: WsData) {
 // Bun owns the fullstack surface: the HTML shell + dev bundler/HMR, and the two
 // WebSocket channels (which need Bun's native `server.upgrade` + pub/sub). Every
 // HTTP API route is delegated to the Hono app (`./api`) via `fetch`.
-await Promise.all((await listWorkspaces()).map(failInterruptedViewStarts))
+const registeredWorkspaces = await listWorkspaces()
+await migrateLegacyWorkspaceState(registeredWorkspaces)
+await prepareWorkspaceStates(registeredWorkspaces)
+await Promise.all(registeredWorkspaces.map(failInterruptedViewStarts))
 
 // Managed machines serve the web side on a Unix socket file that only the
 // machine's gateway can open, so nothing else running there reaches the API
@@ -157,6 +161,8 @@ export const app = Bun.serve<WsData>({
       ? new Response('Not found', { status: 404 })
       : devSandbox,
     '/workspace/*': shell,
+    '/settings': shell,
+    '/onboarding': shell,
 
     // Chat websocket — app-wide (one per client, not per workspace). Each chat
     // frame carries its own workspaceId.
@@ -191,7 +197,16 @@ export const app = Bun.serve<WsData>({
   },
   // Anything not matched above (the whole HTTP API + prod static assets + 404)
   // is handled by Hono.
-  fetch: req => api.fetch(req),
+  fetch: (req, server) => {
+    // Downloads can exceed the normal HTTP idle timeout; the installer has its own deadline.
+    if (
+      req.method === 'POST' &&
+      /^\/api\/harnesses\/(claude-code|codex)\/auth\/install$/.test(new URL(req.url).pathname)
+    ) {
+      server.timeout(req, 0)
+    }
+    return api.fetch(req)
+  },
   websocket: {
     open(ws) {
       if (ws.data.channel === 'collab') {
@@ -238,12 +253,12 @@ export const app = Bun.serve<WsData>({
             optimisticId: data.optimisticId,
             model: data.model,
             effort: data.effort,
-            fastMode: data.fastMode,
+            speedMode: data.speedMode,
             stream: data.stream,
             context: data.context,
             agentId: workspace.agentId
           }).catch(error => {
-            if (error instanceof AttachmentUploadError || error instanceof PendingViewError) {
+            if (error instanceof Error) {
               broadcast(workspace.id, {
                 kind: 'error',
                 sessionId: data.sessionId,

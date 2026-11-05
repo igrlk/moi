@@ -3,44 +3,83 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import {
+  DEFAULT_WORKSPACE_STATE_ROOT,
+  setWorkspaceStateRoot,
+  updateWorkspaceState
+} from '../workspace-state'
 import { getSessionConfig, saveSessionConfig } from './config'
-import { DEFAULT_SESSION_STORE_PATH, setSessionStorePath, renameSessionRecord } from './store'
+import { renameSessionEntry } from './store'
 
 let scratchDir = ''
-const workspacePath = '/workspace'
-let storePath = ''
+const ws = { id: 'ws-1', path: '/workspace' }
 
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), 'moi-session-config-'))
-  storePath = join(scratchDir, 'sessions.json')
-  setSessionStorePath(storePath)
+  setWorkspaceStateRoot(scratchDir)
 })
 
 afterEach(async () => {
-  setSessionStorePath(DEFAULT_SESSION_STORE_PATH)
+  setWorkspaceStateRoot(DEFAULT_WORKSPACE_STATE_ROOT)
   await rm(scratchDir, { recursive: true, force: true })
 })
 
 describe('session Fast mode config', () => {
-  test('preserves explicit false and clears only when asked', async () => {
-    await saveSessionConfig(workspacePath, 'session-1', {
+  test('Ultrafast survives a disk reload and a session rename', async () => {
+    await saveSessionConfig(ws, 'temporary', { speedMode: 'ultrafast' })
+    setWorkspaceStateRoot(scratchDir)
+    expect(await getSessionConfig(ws, 'temporary')).toEqual({ speedMode: 'ultrafast' })
+    await updateWorkspaceState(ws, state => renameSessionEntry(state, 'temporary', 'real'))
+    expect(await getSessionConfig(ws, 'real')).toEqual({ speedMode: 'ultrafast' })
+    await saveSessionConfig(ws, 'real', { speedMode: 'normal' })
+    expect(await getSessionConfig(ws, 'real')).toEqual({ speedMode: 'normal' })
+  })
+  test('preserves explicit normal and clears only when asked', async () => {
+    await saveSessionConfig(ws, 'session-1', {
       model: 'sonnet',
-      fastMode: false
+      speedMode: 'normal'
     })
-    expect(await getSessionConfig(workspacePath, 'session-1')).toEqual({
+    expect(await getSessionConfig(ws, 'session-1')).toEqual({
       model: 'sonnet',
-      fastMode: false
+      speedMode: 'normal'
     })
 
-    await saveSessionConfig(workspacePath, 'session-1', { fastMode: null })
-    expect(await getSessionConfig(workspacePath, 'session-1')).toEqual({ model: 'sonnet' })
+    await saveSessionConfig(ws, 'session-1', { speedMode: null })
+    expect(await getSessionConfig(ws, 'session-1')).toEqual({ model: 'sonnet' })
   })
 
-  test('keeps false when a temporary session config is renamed', async () => {
-    await saveSessionConfig(workspacePath, 'temporary', { fastMode: false })
-    await renameSessionRecord(workspacePath, 'temporary', 'real')
+  test('keeps normal when a temporary session config is renamed', async () => {
+    await saveSessionConfig(ws, 'temporary', { speedMode: 'normal' })
+    await updateWorkspaceState(ws, state => renameSessionEntry(state, 'temporary', 'real'))
 
-    expect(await getSessionConfig(workspacePath, 'temporary')).toEqual({})
-    expect(await getSessionConfig(workspacePath, 'real')).toEqual({ fastMode: false })
+    expect(await getSessionConfig(ws, 'temporary')).toEqual({})
+    expect(await getSessionConfig(ws, 'real')).toEqual({ speedMode: 'normal' })
   })
+})
+
+test.each([
+  { saved: { fastMode: true }, expected: undefined },
+  { saved: { fastMode: false }, expected: undefined },
+  { saved: { fastMode: 'ultrafast' }, expected: undefined },
+  { saved: { speedMode: false }, expected: undefined },
+  { saved: { speedMode: 'normal', fastMode: true }, expected: 'normal' },
+  { saved: { speedMode: 'fast' }, expected: 'fast' },
+  { saved: { speedMode: 'ultrafast' }, expected: 'ultrafast' },
+  { saved: {}, expected: undefined },
+  { saved: { speedMode: 'unknown' }, expected: undefined }
+])('loads and rewrites saved speed settings: $saved', async ({ saved, expected }) => {
+  const path = join(scratchDir, ws.id, 'state.json')
+  await Bun.write(
+    path,
+    JSON.stringify({
+      version: 1,
+      workspacePath: ws.path,
+      sessions: { saved: { config: saved } }
+    })
+  )
+  expect((await getSessionConfig(ws, 'saved')).speedMode).toBe(expected)
+  await saveSessionConfig(ws, 'saved', { effort: 'high' })
+  const config = (await Bun.file(path).json()).sessions.saved.config
+  expect(config.speedMode).toBe(expected)
+  expect(config).not.toHaveProperty('fastMode')
 })

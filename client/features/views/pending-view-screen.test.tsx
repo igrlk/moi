@@ -10,12 +10,13 @@ const pendingView: PendingView = {
   id: 'draft-1',
   status: 'draft',
   requirements: '',
-  executionSessionId: 'session-1'
+  buildSessionId: 'session-1'
 }
 
 function renderPendingView(
   displayStatus: PendingView['status'] | 'waiting' | 'building',
-  active = true
+  active = true,
+  chatOpen = false
 ): string {
   return renderToStaticMarkup(
     createElement(PendingViewScreen, {
@@ -27,6 +28,7 @@ function renderPendingView(
           displayStatus === 'waiting' || displayStatus === 'building' ? 'submitted' : displayStatus
       },
       chatDocked: false,
+      chatOpen,
       workspaceId: 'workspace-1',
       onEditingStart: () => undefined,
       onContinueInChat: () => undefined,
@@ -37,6 +39,14 @@ function renderPendingView(
 }
 
 describe('PendingViewScreen', () => {
+  test('keeps the chat action visible with a contextual label', () => {
+    for (const status of ['waiting', 'failed'] as const) {
+      expect(renderPendingView(status, true, false)).toContain('Open chat')
+      expect(renderPendingView(status, true, true)).toContain('Go to chat')
+      expect(renderPendingView(status, true, true)).toContain('Discard view')
+    }
+  })
+
   test('renders the sketch for both active and inactive drafts', () => {
     const active = renderPendingView('draft')
     const inactive = renderPendingView('draft', false)
