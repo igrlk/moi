@@ -15,6 +15,7 @@ import {
 } from '@/client/features/dev/chat-states-fixtures'
 import type { WorkspaceMembersSnapshot } from '@/client/features/collab/members/types'
 import type { StreamEvent } from '@/lib/format'
+import { FONT_THEMES } from '@/lib/themes'
 import type {
   AppSettings,
   ClientAppConfig,
@@ -219,14 +220,39 @@ export const API: Record<string, unknown> = {
 const FONTS_USER_AGENT =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
 
+// Google sometimes answers with unversioned subset files (fonts.gstatic.com/l/…)
+// that render different glyphs: ask again until the files are the versioned
+// ones. Every theme's stylesheet is fetched once before the tests start, so a
+// slow answer can't land after a screenshot.
+async function fetchVersionedStylesheet(url: string): Promise<string> {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const response = await fetch(url, { headers: { 'user-agent': FONTS_USER_AGENT } })
+    const css = await response.text()
+    if (response.ok && !css.includes('fonts.gstatic.com/l/')) return css
+  }
+  throw new Error(`visual tests: Google Fonts kept answering ${url} with unversioned files`)
+}
+
+const fontQueries = Object.values(FONT_THEMES).flatMap(theme =>
+  theme.googleFontsQuery ? [theme.googleFontsQuery] : []
+)
+// The URLs client/runtime/workspace-theme.ts builds: one per theme, and the
+// preview sheet with every theme.
+const fontStylesheets = new Map(
+  await Promise.all(
+    [...new Set([...fontQueries, fontQueries.join('&family=')])].map(async query => {
+      const url = `https://fonts.googleapis.com/css2?family=${query}&display=swap`
+      return [url, await fetchVersionedStylesheet(url)] as const
+    })
+  )
+)
+
 async function pinGoogleFontsStylesheet(route: Route) {
-  const response = await fetch(route.request().url(), {
-    headers: { 'user-agent': FONTS_USER_AGENT }
-  })
+  const url = route.request().url()
+  const css = fontStylesheets.get(url) ?? (await fetchVersionedStylesheet(url))
   route.fulfill({
-    status: response.status,
-    body: new Uint8Array(await response.arrayBuffer()),
-    contentType: response.headers.get('content-type') ?? 'text/css',
+    body: css,
+    contentType: 'text/css',
     headers: { 'access-control-allow-origin': '*' }
   })
 }
