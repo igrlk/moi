@@ -50,6 +50,6 @@ jobs:
         run: |
           FLAGS="--static-dir uiverify-archive --exit-zero-on-changes"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then FLAGS="$FLAGS --auto-accept-changes"; fi
-          npx --yes uiverify@1.8.1 upload $FLAGS
+          npx --yes uiverify@1.11.0 upload $FLAGS
         env:
           UIVERIFY_API_KEY: ${{ secrets.UIVERIFY_API_KEY }}
